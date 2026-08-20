@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="설교노트">
+<meta name="theme-color" content="#33396b">
+<link rel="manifest" href="manifest.json">
+<title>설교노트</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/moonspam/NanumSquare@2.0/nanumsquare.css">
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700;800&display=swap" rel="stylesheet">
+<script src="bible-data.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg-main:#f2f3f9;
+  --ink:#262c4a;
+  --muted:#7b81a3;
+  --dim:#aab0c8;
+  --accent:#3c4374;
+  --accent-dark:#282d54;
+  --accent-light:#e8e9f6;
+  --accent-soft:#d3d6ee;
+  --gold:#bd9640;
+  --gold-dark:#96742c;
+  --gold-light:#faf4e2;
+  --gold-soft:#f0e1b4;
+  --card-bg:rgba(255,255,255,0.86);
+  --border:#e2e3f0;
+  --danger:#c15a5a;
+  --radius:14px;
+}
+html,body{height:100%;overflow:hidden}
+body{
+  font-family:'NanumSquare','Nanum Gothic',sans-serif;
+  background:var(--bg-main);color:var(--ink);
+  display:flex;flex-direction:column;position:relative;
+}
+body::before{
+  content:'';position:fixed;inset:0;z-index:-1;
+  background:
+    radial-gradient(circle at 12% -10%, rgba(189,150,64,0.16), transparent 45%),
+    radial-gradient(circle at 100% 10%, rgba(60,67,116,0.14), transparent 40%),
+    linear-gradient(165deg,#eef0f8,#f7f4ea 65%,#f2eee0);
+}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--accent-soft);border-radius:4px}
+
+/* ── TOP BAR ── */
+.topbar{background:linear-gradient(100deg,var(--accent-dark),var(--accent));flex-shrink:0;box-shadow:0 2px 14px rgba(40,45,84,0.25);position:relative;z-index:5}
+.topbar-inner{display:flex;align-items:center;justify-content:space-between;padding:14px 18px 12px}
+.app-title{display:flex;align-items:center;gap:8px;font-family:'NanumSquare','Nanum Gothic',sans-serif;font-size:20px;font-weight:800;letter-spacing:2px;color:#fdf9ec}
+.app-title .ribbon{display:inline-block;width:6px;height:20px;background:linear-gradient(180deg,var(--gold),var(--gold-dark));border-radius:2px;box-shadow:0 1px 4px rgba(0,0,0,0.25)}
+.topbar-sub{font-size:10.5px;color:rgba(253,249,236,0.65);letter-spacing:0.5px}
+
+/* ── APP BODY ── */
+#app-body{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.hidden{display:none !important}
+
+/* ── FILTER BAR ── */
+.filter-bar{display:flex;gap:8px;padding:10px 14px;flex-shrink:0;background:rgba(255,255,255,0.55);border-bottom:1px solid var(--border)}
+.filter-bar input, .filter-bar select{
+  font-family:'NanumSquare','Nanum Gothic',sans-serif;font-size:13px;border:1px solid var(--border);
+  border-radius:10px;padding:8px 10px;background:#fff;color:var(--ink);
+}
+.filter-bar input{flex:1;min-width:0}
+.filter-bar select{flex-shrink:0;max-width:110px}
+
+/* ── LIST ── */
+.scroll-area{flex:1;overflow-y:auto;padding:12px 14px 90px}
+.empty-state{text-align:center;padding:60px 20px;color:var(--dim);font-size:13px;line-height:1.8}
+.sermon-card{
+  position:relative;margin-bottom:10px;padding:14px 16px 14px 20px;border-radius:var(--radius);
+  background:var(--card-bg);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);
+  border:1px solid var(--border);box-shadow:0 2px 10px rgba(40,45,84,0.06);cursor:pointer;transition:box-shadow .2s,transform .2s;
+}
+.sermon-card:hover{box-shadow:0 4px 18px rgba(40,45,84,0.12);transform:translateY(-1px)}
+.sermon-card::before{
+  content:'';position:absolute;left:0;top:10px;bottom:10px;width:4px;
+  background:linear-gradient(180deg,var(--gold),var(--gold-dark));border-radius:0 3px 3px 0;
+}
+.sermon-card .row1{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.sermon-date{font-size:11px;color:var(--gold-dark);font-weight:700;letter-spacing:0.5px}
+.sermon-series{font-size:10px;color:var(--muted);background:var(--accent-light);padding:2px 8px;border-radius:10px}
+.sermon-title{font-size:15px;font-weight:800;color:var(--ink);margin-bottom:3px;line-height:1.35}
+.sermon-meta{font-size:12px;color:var(--muted)}
+
+/* ── FAB ── */
+.fab{
+  position:fixed;right:20px;bottom:24px;width:54px;height:54px;border-radius:50%;
+  background:linear-gradient(135deg,var(--accent),var(--accent-dark));color:#fdf9ec;border:none;
+  font-size:26px;box-shadow:0 6px 18px rgba(40,45,84,0.35);cursor:pointer;z-index:10;
+  display:flex;align-items:center;justify-content:center;
+}
+.fab:hover{transform:scale(1.05)}
+
+/* ── DETAIL VIEW ── */
+#view-detail{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.detail-topbar{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);background:rgba(255,255,255,0.6);flex-shrink:0}
+.back-btn{background:none;border:1px solid var(--border);border-radius:16px;padding:5px 12px;font-size:12px;color:var(--accent);cursor:pointer;font-family:'NanumSquare','Nanum Gothic',sans-serif}
+.back-btn:hover{background:var(--accent-light)}
+.detail-topbar .spacer{flex:1}
+.admin-edit-btn{background:none;border:1px solid var(--gold-soft);color:var(--gold-dark);border-radius:16px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:'NanumSquare','Nanum Gothic',sans-serif}
+.admin-edit-btn:hover{background:var(--gold-light)}
+
+.detail-scroll{flex:1;overflow-y:auto;padding:16px 16px 90px}
+.sermon-header{margin-bottom:14px}
+.sermon-header .d-date{font-size:12px;color:var(--gold-dark);font-weight:700}
+.sermon-header .d-title{font-family:'NanumSquare','Nanum Gothic',sans-serif;font-size:21px;font-weight:800;color:var(--ink);margin:4px 0 6px;line-height:1.4}
+.sermon-header .d-meta{font-size:13px;color:var(--muted)}
+
+.scripture-box{
+  margin-bottom:16px;border-radius:var(--radius);overflow:hidden;background:var(--gold-light);
+  border:1px solid var(--gold-soft);padding:14px 16px;
+}
+.scripture-ref{font-size:12.5px;font-weight:800;color:var(--gold-dark);margin-bottom:8px;letter-spacing:0.5px}
+.verse-line{display:flex;gap:6px;font-size:14px;line-height:1.75;color:#3a2f10;margin-bottom:2px}
+.verse-num{flex-shrink:0;font-size:11px;font-weight:800;color:var(--gold-dark);margin-top:3px}
+.verse-body{flex:1}
+
+.note-section{border-radius:var(--radius);background:var(--card-bg);border:1px solid var(--border);padding:14px 16px;box-shadow:0 2px 10px rgba(40,45,84,0.06)}
+.note-section .note-label{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.note-section .note-label span{font-size:13px;font-weight:800;color:var(--accent-dark)}
+#note-save-status{font-size:10.5px;color:var(--dim)}
+#note-editor{
+  width:100%;min-height:280px;border:none;outline:none;resize:vertical;
+  font-family:'NanumSquare','Nanum Gothic',sans-serif;font-size:14.5px;line-height:1.8;color:var(--ink);
+  background:transparent;
+}
+#note-editor::placeholder{color:var(--dim)}
+.note-bible-toggle{background:none;border:1px solid var(--gold-soft);color:var(--gold-dark);border-radius:14px;padding:3px 10px;font-size:11px;cursor:pointer;font-family:'NanumSquare','Nanum Gothic',sans-serif}
+.note-bible-toggle:hover{background:var(--gold-light)}
+.note-bible-toggle.active{background:var(--gold-light);border-color:var(--gold)}
+.note-save-btn{background:var(--accent-light);border:1px solid var(--accent-soft);color:var(--accent-dark);border-radius:14px;padding:3px 10px;font-size:11px;cursor:pointer;font-family:'NanumSquare','Nanum Gothic',sans-serif;font-weight:700}
+.note-save-btn:hover{background:var(--accent-soft)}
+#note-bible-search-box{margin-bottom:10px}
+
+/* ── MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(30,32,55,0.45);display:none;align-items:flex-end;justify-content:center;z-index:100}
+.modal-overlay.open{display:flex}
+.modal{
+  background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:480px;max-height:88vh;
+  overflow-y:auto;box-shadow:0 -8px 30px rgba(0,0,0,0.25);
+}
+@media (min-height:700px){
+  .modal-overlay{align-items:center}
+  .modal{border-radius:20px;max-height:80vh}
+}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--border);position:sticky;top:0;background:#fff;z-index:2}
+.modal-title{font-size:15px;font-weight:800;color:var(--accent-dark)}
+.modal-close{background:none;border:none;font-size:18px;color:var(--muted);cursor:pointer;padding:4px}
+.modal-body{padding:16px 18px 24px}
+
+.field-label{font-size:12px;font-weight:700;color:var(--muted);margin:14px 0 6px}
+.field-label:first-child{margin-top:0}
+.form-input, .form-select, .form-textarea{
+  width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;
+  font-family:'NanumSquare','Nanum Gothic',sans-serif;font-size:14px;color:var(--ink);background:#fbfbfd;
+}
+.form-textarea{min-height:70px;resize:vertical}
+.form-row{display:flex;gap:8px}
+.form-row > *{flex:1}
+
+.bible-search-box{margin-top:8px;border:1px solid var(--gold-soft);background:var(--gold-light);border-radius:10px;padding:10px}
+.bible-search-row{display:flex;gap:6px}
+.bible-search-row input{flex:1;border:1px solid var(--gold-soft);border-radius:8px;padding:8px 10px;font-size:13px;font-family:'NanumSquare','Nanum Gothic',sans-serif}
+.bible-search-row button{flex-shrink:0;background:var(--gold-dark);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12.5px;font-weight:700;cursor:pointer}
+.bible-search-hint{font-size:10.5px;color:var(--gold-dark);margin-top:5px;opacity:0.8}
+#edit-scripture-text{
+  margin-top:8px;min-height:90px;border:1px solid var(--border);border-radius:10px;padding:10px 12px;
+  background:#fff;font-size:13.5px;line-height:1.7;
+}
+.clear-scripture-btn{margin-top:6px;background:none;border:none;font-size:11.5px;color:var(--danger);cursor:pointer;text-decoration:underline}
+
+.modal-btn-row{display:flex;gap:8px;margin-top:20px}
+.btn-primary{flex:1;background:var(--accent);color:#fff;border:none;border-radius:24px;padding:12px;font-size:14px;font-weight:800;cursor:pointer;font-family:'NanumSquare','Nanum Gothic',sans-serif}
+.btn-primary:hover{background:var(--accent-dark)}
+.btn-secondary{background:none;border:1px solid var(--border);color:var(--muted);border-radius:24px;padding:12px 18px;font-size:13px;cursor:pointer;font-family:'NanumSquare','Nanum Gothic',sans-serif}
+
+/* ── TOAST ── */
+#toast{
+  position:fixed;left:50%;bottom:30px;transform:translateX(-50%) translateY(20px);
+  background:rgba(38,44,74,0.94);color:#fdf9ec;padding:10px 20px;border-radius:24px;font-size:13px;
+  opacity:0;pointer-events:none;transition:all .25s;z-index:200;white-space:nowrap;font-family:'NanumSquare','Nanum Gothic',sans-serif;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="app-title"><span class="ribbon"></span>설교노트</div>
+    <div class="topbar-sub">📱 이 기기에만 저장</div>
+  </div>
+</div>
+
+<div id="app-body">
+
+  <div id="view-list">
+    <div class="filter-bar">
+      <input type="text" id="filter-text" placeholder="설교자·제목 검색" oninput="renderSermonList()">
+      <select id="filter-series" onchange="renderSermonList()">
+        <option value="">전체 시리즈</option>
+      </select>
+    </div>
+    <div class="scroll-area" id="sermon-list"></div>
+  </div>
+
+  <div id="view-detail" class="hidden">
+    <div class="detail-topbar">
+      <button class="back-btn" onclick="closeDetail()">← 목록</button>
+      <div class="spacer"></div>
+      <button class="admin-edit-btn" id="detail-edit-btn" onclick="openSermonEditModal(currentSermonId)">✎ 설교정보 수정</button>
+    </div>
+    <div class="detail-scroll">
+      <div class="sermon-header">
+        <div class="d-date" id="detail-date"></div>
+        <div class="d-title" id="detail-title"></div>
+        <div class="d-meta" id="detail-meta"></div>
+      </div>
+      <div class="scripture-box hidden" id="detail-scripture-box">
+        <div class="scripture-ref" id="detail-scripture-ref"></div>
+        <div id="detail-scripture-text"></div>
+      </div>
+      <div class="note-section">
+        <div class="note-label">
+          <span>📝 나의 노트</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <button class="note-bible-toggle" onclick="toggleNoteBibleSearch()">📖 말씀 검색</button>
+            <button class="note-save-btn" onclick="saveNoteManually()">💾 저장</button>
+            <span id="note-save-status"></span>
+          </div>
+        </div>
+        <div class="bible-search-box hidden" id="note-bible-search-box">
+          <div class="bible-search-row">
+            <input type="text" id="note-bible-query" placeholder="구절(요 3:16) 또는 단어로 검색" onkeydown="if(event.key==='Enter'){event.preventDefault();bibleSearchForNote();}">
+            <select id="note-bible-version" style="flex-shrink:0;border:1px solid var(--gold-soft);border-radius:8px;padding:8px 6px;font-size:12px;font-family:'NanumSquare','Nanum Gothic',sans-serif;color:var(--gold-dark);background:#fff">
+              <option value="GAEGYE">개역개정</option>
+              <option value="EASY">쉬운성경</option>
+            </select>
+            <button onclick="bibleSearchForNote()">검색</button>
+          </div>
+          <div class="bible-search-hint">검색하면 노트 커서 위치에 바로 삽입돼요</div>
+        </div>
+        <textarea id="note-editor" placeholder="설교를 들으며 마음에 남는 것을 자유롭게 적어보세요..." oninput="scheduleNoteSave()"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <button class="fab" id="fab-add-sermon" onclick="openSermonEditModal()">＋</button>
+</div>
+
+<!-- SERMON EDIT MODAL -->
+<div class="modal-overlay" id="sermon-edit-modal" onclick="closeModal('sermon-edit-modal',event)">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="sermon-edit-title">📖 설교 등록</span>
+      <button class="modal-close" onclick="closeModalDirect('sermon-edit-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div>
+          <div class="field-label">날짜</div>
+          <input type="date" class="form-input" id="edit-date">
+        </div>
+        <div>
+          <div class="field-label">설교자</div>
+          <input type="text" class="form-input" id="edit-preacher" placeholder="예: 김OO 목사">
+        </div>
+      </div>
+      <div class="field-label">제목</div>
+      <input type="text" class="form-input" id="edit-title" placeholder="설교 제목">
+      <div class="field-label">시리즈 (선택)</div>
+      <input type="text" class="form-input" id="edit-series" placeholder="예: 로마서 강해 1부">
+
+      <div class="field-label">본문 말씀</div>
+      <input type="text" class="form-input" id="edit-scripture-ref" placeholder="예: 로마서 8:28-30">
+      <div class="bible-search-box">
+        <div class="bible-search-row">
+          <input type="text" id="edit-bible-query" placeholder="구절(요 3:16) 또는 단어로 검색">
+          <select id="edit-bible-version" style="flex-shrink:0;border:1px solid var(--gold-soft);border-radius:8px;padding:8px 6px;font-size:12px;font-family:'NanumSquare','Nanum Gothic',sans-serif;color:var(--gold-dark);background:#fff">
+            <option value="GAEGYE">개역개정</option>
+            <option value="EASY">쉬운성경</option>
+          </select>
+          <button onclick="bibleSearchForEdit()">검색</button>
+        </div>
+        <div class="bible-search-hint">검색하면 아래 본문 영역에 바로 추가돼요</div>
+      </div>
+      <div id="edit-scripture-text" contenteditable="true"></div>
+      <button class="clear-scripture-btn" onclick="clearEditScripture()">본문 지우기</button>
+
+      <div class="modal-btn-row">
+        <button class="btn-secondary hidden" id="delete-sermon-btn" onclick="deleteSermon()">삭제</button>
+        <button class="btn-primary" onclick="saveSermon()">저장</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════
+// 완전 로컬(개인용) 버전 — 서버/로그인 없이 이 브라우저에만 저장됩니다.
+// 데이터는 localStorage에 저장되므로, 브라우저 저장공간을 지우면 함께 사라져요.
+// ══════════════════════════════════════════
+const STORAGE_KEY = 'sermonNotes_v1';
+
+let sermons = [];        // {id, date, title, preacher, series, scriptureRef, scriptureHtml, note, createdAt, updatedAt}
+let currentSermonId = null;
+let noteSaveTimer = null;
+let editingSermonId = null; // null이면 신규 등록
+
+// ── 저장소 ──
+function loadSermonsFromStorage(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    sermons = raw ? JSON.parse(raw) : [];
+  }catch(e){
+    console.error(e);
+    sermons = [];
+  }
+}
+function saveSermonsToStorage(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(sermons));
+}
+
+// ── 유틸 ──
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200);}
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModalDirect(id){document.getElementById(id).classList.remove('open');}
+function closeModal(id,event){ if(event.target.id===id) closeModalDirect(id); }
+function escapeHtml(s){
+  if(!s) return '';
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function formatDateDisplay(dateStr){
+  if(!dateStr) return '';
+  const d = new Date(dateStr+'T00:00:00');
+  if(isNaN(d)) return dateStr;
+  const days=['일','월','화','수','목','금','토'];
+  return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} (${days[d.getDay()]})`;
+}
+function genId(){ return 'sm_' + Date.now() + '_' + Math.random().toString(36).slice(2,8); }
+
+// ── 초기 로드 ──
+document.addEventListener('DOMContentLoaded', ()=>{
+  loadSermonsFromStorage();
+  updateSeriesFilterOptions();
+  renderSermonList();
+});
+
+function updateSeriesFilterOptions(){
+  const sel = document.getElementById('filter-series');
+  const current = sel.value;
+  const seriesSet = [...new Set(sermons.map(s=>s.series).filter(Boolean))];
+  sel.innerHTML = '<option value="">전체 시리즈</option>' +
+    seriesSet.map(s=>`<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+  sel.value = seriesSet.includes(current) ? current : '';
+}
+
+function renderSermonList(){
+  const listEl = document.getElementById('sermon-list');
+  const q = document.getElementById('filter-text').value.trim().toLowerCase();
+  const seriesFilter = document.getElementById('filter-series').value;
+  let filtered = [...sermons].sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+  if(seriesFilter) filtered = filtered.filter(s=>s.series === seriesFilter);
+  if(q) filtered = filtered.filter(s=>
+    (s.title||'').toLowerCase().includes(q) || (s.preacher||'').toLowerCase().includes(q)
+  );
+  if(!filtered.length){
+    listEl.innerHTML = `<div class="empty-state">${sermons.length? '검색 결과가 없어요' : '오른쪽 아래 + 버튼으로<br>첫 설교노트를 남겨보세요'}</div>`;
+    return;
+  }
+  listEl.innerHTML = filtered.map(s=>`
+    <div class="sermon-card" onclick="openDetail('${s.id}')">
+      <div class="row1">
+        <span class="sermon-date">${formatDateDisplay(s.date)}</span>
+        ${s.series?`<span class="sermon-series">${escapeHtml(s.series)}</span>`:''}
+      </div>
+      <div class="sermon-title">${escapeHtml(s.title||'(제목 없음)')}</div>
+      <div class="sermon-meta">${escapeHtml(s.preacher||'')}</div>
+    </div>
+  `).join('');
+}
+
+// ── 설교 상세 + 노트 ──
+function openDetail(id){
+  const s = sermons.find(x=>x.id===id);
+  if(!s) return;
+  currentSermonId = id;
+  renderDetailHeader(s);
+  document.getElementById('view-list').classList.add('hidden');
+  document.getElementById('view-detail').classList.remove('hidden');
+  document.getElementById('fab-add-sermon').classList.add('hidden');
+  document.getElementById('note-editor').value = s.note || '';
+  document.getElementById('note-save-status').textContent = '';
+  document.getElementById('note-bible-search-box').classList.add('hidden');
+  document.getElementById('note-bible-query').value = '';
+  document.querySelector('.note-bible-toggle').classList.remove('active');
+}
+
+function renderDetailHeader(s){
+  document.getElementById('detail-date').textContent = formatDateDisplay(s.date);
+  document.getElementById('detail-title').textContent = s.title || '(제목 없음)';
+  document.getElementById('detail-meta').textContent = [s.preacher, s.series].filter(Boolean).join(' · ');
+  const box = document.getElementById('detail-scripture-box');
+  if(s.scriptureHtml){
+    box.classList.remove('hidden');
+    document.getElementById('detail-scripture-ref').textContent = s.scriptureRef || '';
+    document.getElementById('detail-scripture-text').innerHTML = s.scriptureHtml;
+  } else {
+    box.classList.add('hidden');
+  }
+}
+
+function closeDetail(){
+  currentSermonId = null;
+  document.getElementById('view-detail').classList.add('hidden');
+  document.getElementById('view-list').classList.remove('hidden');
+  document.getElementById('fab-add-sermon').classList.remove('hidden');
+}
+
+function scheduleNoteSave(){
+  document.getElementById('note-save-status').textContent = '작성 중...';
+  if(noteSaveTimer) clearTimeout(noteSaveTimer);
+  noteSaveTimer = setTimeout(saveNoteNow, 600);
+}
+
+function toggleNoteBibleSearch(){
+  const box = document.getElementById('note-bible-search-box');
+  const btn = document.querySelector('.note-bible-toggle');
+  const hidden = box.classList.contains('hidden');
+  box.classList.toggle('hidden');
+  btn.classList.toggle('active', hidden);
+  if(hidden) document.getElementById('note-bible-query').focus();
+}
+
+function insertAtCursor(textarea, text){
+  const start = textarea.selectionStart ?? textarea.value.length;
+  const end = textarea.selectionEnd ?? textarea.value.length;
+  const before = textarea.value.substring(0, start);
+  const after = textarea.value.substring(end);
+  // 삽입 위치 앞에 이미 글자가 있고 줄바꿈이 아니면 줄바꿈부터 시작
+  const needsLeadingBreak = before.length > 0 && !before.endsWith('\n');
+  const insertText = (needsLeadingBreak ? '\n' : '') + text;
+  textarea.value = before + insertText + after;
+  const cursorPos = before.length + insertText.length;
+  textarea.selectionStart = textarea.selectionEnd = cursorPos;
+  textarea.focus();
+}
+
+function buildVersePlainText(headerLabel, verseObjs){
+  let out = `▶ ${headerLabel}\n`;
+  verseObjs.forEach(v=>{ out += `${v.num}  ${v.text}\n`; });
+  out += '\n';
+  return out;
+}
+
+function bibleSearchForNote(){
+  const query = document.getElementById('note-bible-query').value.trim();
+  if(!query){ showToast('검색어를 입력해주세요'); return; }
+  if(!window.BIBLE_DATA){ showToast('성경 데이터 로딩 중... 잠시 후 다시 시도해주세요'); return; }
+
+  const version = document.getElementById('note-bible-version').value;
+  const books = window.BIBLE_DATA.books;
+  const vData = window.BIBLE_DATA[version];
+  const textarea = document.getElementById('note-editor');
+
+  try{
+    const parsed = parseBibleRef(query);
+    if(parsed){
+      const bookIdx = books.indexOf(parsed.book);
+      if(bookIdx < 0) throw new Error('책 이름을 찾을 수 없어요');
+      const bookNo = String(bookIdx + 1);
+      const chap = vData[bookNo] && vData[bookNo][parsed.chapter];
+      if(!chap) throw new Error('해당 장을 찾을 수 없어요');
+      let verseObjs = [];
+      for(let v = parsed.verseStart; v <= parsed.verseEnd; v++){
+        if(chap[String(v)]) verseObjs.push({num:String(v), text:chap[String(v)]});
+      }
+      if(!verseObjs.length) throw new Error('해당 절을 찾을 수 없어요');
+      insertAtCursor(textarea, buildVersePlainText(query, verseObjs));
+      showToast('✓ 노트에 본문이 삽입됐어요');
+    } else {
+      const objs = [];
+      outer:
+      for(const bookNo in vData){
+        const bookName = books[parseInt(bookNo)-1];
+        for(const chap in vData[bookNo]){
+          for(const v in vData[bookNo][chap]){
+            const t = vData[bookNo][chap][v];
+            if(t.includes(query)){
+              objs.push({num:`${bookName} ${chap}:${v}`, text:t});
+              if(objs.length >= 30) break outer;
+            }
+          }
+        }
+      }
+      if(!objs.length) throw new Error('검색 결과가 없어요');
+      insertAtCursor(textarea, buildVersePlainText(`"${query}" 검색 결과`, objs));
+      showToast(`✓ 검색 결과 ${objs.length}건이 삽입됐어요`);
+    }
+    document.getElementById('note-bible-query').value = '';
+    scheduleNoteSave();
+  }catch(e){
+    showToast('⚠️ ' + e.message);
+  }
+}
+
+function saveNoteManually(){
+  if(noteSaveTimer) clearTimeout(noteSaveTimer);
+  saveNoteNow();
+  showToast('✓ 노트가 저장됐어요');
+}
+
+function saveNoteNow(){
+  if(!currentSermonId) return;
+  const s = sermons.find(x=>x.id===currentSermonId);
+  if(!s) return;
+  s.note = document.getElementById('note-editor').value;
+  s.updatedAt = Date.now();
+  saveSermonsToStorage();
+  document.getElementById('note-save-status').textContent = '✓ 저장됨';
+}
+
+// ── 설교 등록/수정 ──
+function openSermonEditModal(id){
+  editingSermonId = id || null;
+  const isEdit = !!editingSermonId;
+  document.getElementById('sermon-edit-title').textContent = isEdit ? '📖 설교 정보 수정' : '📖 설교 등록';
+  document.getElementById('delete-sermon-btn').classList.toggle('hidden', !isEdit);
+
+  if(isEdit){
+    const s = sermons.find(x=>x.id===editingSermonId);
+    document.getElementById('edit-date').value = s.date || '';
+    document.getElementById('edit-preacher').value = s.preacher || '';
+    document.getElementById('edit-title').value = s.title || '';
+    document.getElementById('edit-series').value = s.series || '';
+    document.getElementById('edit-scripture-ref').value = s.scriptureRef || '';
+    document.getElementById('edit-scripture-text').innerHTML = s.scriptureHtml || '';
+  } else {
+    document.getElementById('edit-date').value = new Date().toISOString().slice(0,10);
+    document.getElementById('edit-preacher').value = '';
+    document.getElementById('edit-title').value = '';
+    document.getElementById('edit-series').value = '';
+    document.getElementById('edit-scripture-ref').value = '';
+    document.getElementById('edit-scripture-text').innerHTML = '';
+  }
+  document.getElementById('edit-bible-query').value = '';
+  openModal('sermon-edit-modal');
+}
+
+function saveSermon(){
+  const date = document.getElementById('edit-date').value;
+  const title = document.getElementById('edit-title').value.trim();
+  const preacher = document.getElementById('edit-preacher').value.trim();
+  const series = document.getElementById('edit-series').value.trim();
+  const scriptureRef = document.getElementById('edit-scripture-ref').value.trim();
+  const scriptureHtml = document.getElementById('edit-scripture-text').innerHTML.trim();
+
+  if(!date || !title){ showToast('날짜와 제목은 꼭 입력해주세요'); return; }
+
+  if(editingSermonId){
+    const s = sermons.find(x=>x.id===editingSermonId);
+    Object.assign(s, {date, title, preacher, series, scriptureRef, scriptureHtml, updatedAt: Date.now()});
+    showToast('✓ 수정됐어요');
+  } else {
+    const newSermon = {
+      id: genId(), date, title, preacher, series, scriptureRef, scriptureHtml,
+      note: '', createdAt: Date.now(), updatedAt: Date.now()
+    };
+    sermons.push(newSermon);
+    showToast('✓ 등록됐어요');
+  }
+  saveSermonsToStorage();
+  updateSeriesFilterOptions();
+  renderSermonList();
+  if(currentSermonId){
+    const s = sermons.find(x=>x.id===currentSermonId);
+    if(s) renderDetailHeader(s);
+  }
+  closeModalDirect('sermon-edit-modal');
+}
+
+function deleteSermon(){
+  if(!editingSermonId) return;
+  if(!confirm('이 설교와 노트를 삭제할까요? 삭제하면 되돌릴 수 없어요.')) return;
+  sermons = sermons.filter(x=>x.id!==editingSermonId);
+  saveSermonsToStorage();
+  updateSeriesFilterOptions();
+  showToast('✓ 삭제됐어요');
+  closeModalDirect('sermon-edit-modal');
+  closeDetail();
+  renderSermonList();
+}
+
+function clearEditScripture(){
+  document.getElementById('edit-scripture-ref').value = '';
+  document.getElementById('edit-scripture-text').innerHTML = '';
+}
+
+// ── 성경 검색 (QT앱과 동일한 검색 로직 재사용) ──
+const BOOK_ABBR = {
+  '창':'창세기','출':'출애굽기','레':'레위기','민':'민수기','신':'신명기',
+  '수':'여호수아','삿':'사사기','룻':'룻기','삼상':'사무엘상','삼하':'사무엘하',
+  '왕상':'열왕기상','왕하':'열왕기하','대상':'역대상','대하':'역대하',
+  '스':'에스라','느':'느헤미야','에':'에스더','욥':'욥기','시':'시편',
+  '잠':'잠언','전':'전도서','아':'아가','사':'이사야','렘':'예레미야',
+  '애':'예레미야애가','겔':'에스겔','단':'다니엘','호':'호세아','욜':'요엘',
+  '암':'아모스','옵':'오바댜','욘':'요나','미':'미가','나':'나훔',
+  '합':'하박국','습':'스바냐','학':'학개','슥':'스가랴','말':'말라기',
+  '마':'마태복음','막':'마가복음','눅':'누가복음','요':'요한복음','행':'사도행전',
+  '롬':'로마서','고전':'고린도전서','고후':'고린도후서','갈':'갈라디아서',
+  '엡':'에베소서','빌':'빌립보서','골':'골로새서','살전':'데살로니가전서','살후':'데살로니가후서',
+  '딤전':'디모데전서','딤후':'디모데후서','딛':'디도서','몬':'빌레몬서',
+  '히':'히브리서','약':'야고보서','벧전':'베드로전서','벧후':'베드로후서',
+  '요일':'요한일서','요이':'요한이서','요삼':'요한삼서','유':'유다서','계':'요한계시록'
+};
+
+function parseBibleRef(q){
+  q = q.trim().replace('：',':').replace(/[~∼–]/g,'-');
+  const m = q.match(/^([가-힣]+)\s*(\d+)\s*[:장]\s*(\d+)(?:\s*-\s*(\d+))?/);
+  if(!m) return null;
+  let book = m[1];
+  if(BOOK_ABBR[book]) book = BOOK_ABBR[book];
+  return {
+    book,
+    chapter: m[2],
+    verseStart: parseInt(m[3]),
+    verseEnd: m[4] ? parseInt(m[4]) : parseInt(m[3])
+  };
+}
+
+function buildVerseLinesHTML(verseObjs){
+  return verseObjs.map(v=>`<div class="verse-line"><span class="verse-num">${escapeHtml(v.num)}</span><span class="verse-body">${escapeHtml(v.text)}</span></div>`).join('');
+}
+
+function bibleSearchForEdit(){
+  const query = document.getElementById('edit-bible-query').value.trim();
+  if(!query){ showToast('검색어를 입력해주세요'); return; }
+  if(!window.BIBLE_DATA){ showToast('성경 데이터 로딩 중... 잠시 후 다시 시도해주세요'); return; }
+
+  const version = document.getElementById('edit-bible-version').value;
+  const books = window.BIBLE_DATA.books;
+  const vData = window.BIBLE_DATA[version];
+  const refEl = document.getElementById('edit-scripture-ref');
+  const textEl = document.getElementById('edit-scripture-text');
+
+  try{
+    const parsed = parseBibleRef(query);
+    if(parsed){
+      const bookIdx = books.indexOf(parsed.book);
+      if(bookIdx < 0) throw new Error('책 이름을 찾을 수 없어요');
+      const bookNo = String(bookIdx + 1);
+      const chap = vData[bookNo] && vData[bookNo][parsed.chapter];
+      if(!chap) throw new Error('해당 장을 찾을 수 없어요');
+      let verseObjs = [];
+      for(let v = parsed.verseStart; v <= parsed.verseEnd; v++){
+        if(chap[String(v)]) verseObjs.push({num:String(v), text:chap[String(v)]});
+      }
+      if(!verseObjs.length) throw new Error('해당 절을 찾을 수 없어요');
+      if(!refEl.value) refEl.value = query;
+      textEl.innerHTML = textEl.innerHTML ? textEl.innerHTML + buildVerseLinesHTML(verseObjs) : buildVerseLinesHTML(verseObjs);
+      showToast('✓ 본문이 추가됐어요');
+    } else {
+      const objs = [];
+      outer:
+      for(const bookNo in vData){
+        const bookName = books[parseInt(bookNo)-1];
+        for(const chap in vData[bookNo]){
+          for(const v in vData[bookNo][chap]){
+            const t = vData[bookNo][chap][v];
+            if(t.includes(query)){
+              objs.push({num:`${bookName} ${chap}:${v}`, text:t});
+              if(objs.length >= 30) break outer;
+            }
+          }
+        }
+      }
+      if(!objs.length) throw new Error('검색 결과가 없어요');
+      textEl.innerHTML = textEl.innerHTML ? textEl.innerHTML + buildVerseLinesHTML(objs) : buildVerseLinesHTML(objs);
+      showToast(`✓ 검색 결과 ${objs.length}건이 추가됐어요`);
+    }
+    document.getElementById('edit-bible-query').value = '';
+  }catch(e){
+    showToast('⚠️ ' + e.message);
+  }
+}
+</script>
+</body>
+</html>
