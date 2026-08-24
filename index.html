@@ -909,7 +909,8 @@ function buildNoteHtmlWithImages(noteText, images){
   const byNum = {};
   (images || []).forEach(img=>{ if(img.num) byNum[img.num] = img; });
 
-  // 문단(빈 줄) 단위로 나눠서 각 문단이 페이지/단 경계에서 어색하게 끊기지 않도록 해요.
+  // 문단(빈 줄) 단위로 나눠요. (문단이 안 끊기게 강제하면 남는 공간을 못 써서 여백이 커지는 부작용이 있어,
+  // 사진만 통째로 유지하고 텍스트 문단은 자유롭게 흐르도록 해요)
   const paragraphs = noteText.split(/\n{2,}/);
 
   return paragraphs.map(para=>{
@@ -922,9 +923,9 @@ function buildNoteHtmlWithImages(noteText, images){
       // 사진은 별도의 블록으로 분리해서 2단 레이아웃에서도 폭 전체를 쓰도록(column-span) 해요
       return `</div><div style="break-inside:avoid;column-span:all;margin:10px 0">`
         + `<img src="${img.dataUrl}" style="width:${widthPx}px;max-width:100%;height:auto;display:block;border-radius:10px;border:3px solid #fff;box-shadow:0 0 0 1px rgba(189,150,64,0.2)">`
-        + `</div><div style="break-inside:avoid;white-space:pre-wrap">`;
+        + `</div><div style="white-space:pre-wrap">`;
     });
-    return `<div style="break-inside:avoid;white-space:pre-wrap;margin-bottom:14px">${withImages}</div>`;
+    return `<div style="white-space:pre-wrap;margin-bottom:14px">${withImages}</div>`;
   }).join('');
 }
 
