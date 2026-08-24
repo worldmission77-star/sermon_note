@@ -252,11 +252,7 @@ body::before{
     font-family:'NanumSquare','Nanum Gothic',sans-serif; font-size:13.5px; line-height:1.85; color:#000;
     break-inside:auto !important; page-break-inside:auto !important;
   }
-  #note-editor-print.two-col{
-    column-count:2; column-gap:26px; column-rule:1px solid #e5ddc5; column-fill:auto;
-    break-inside:auto !important; page-break-inside:auto !important;
-  }
-  .note-image-item{max-width:100% !important; break-inside:avoid !important; page-break-inside:avoid !important; column-span:all}
+  .note-image-item{max-width:100% !important; break-inside:avoid !important; page-break-inside:avoid !important}
   .note-image-thumb{box-shadow:none !important; border:1px solid #ddd !important}
 }
 </style>
@@ -909,8 +905,6 @@ function buildNoteHtmlWithImages(noteText, images){
   const byNum = {};
   (images || []).forEach(img=>{ if(img.num) byNum[img.num] = img; });
 
-  // 문단(빈 줄) 단위로 나눠요. (문단이 안 끊기게 강제하면 남는 공간을 못 써서 여백이 커지는 부작용이 있어,
-  // 사진만 통째로 유지하고 텍스트 문단은 자유롭게 흐르도록 해요)
   const paragraphs = noteText.split(/\n{2,}/);
 
   return paragraphs.map(para=>{
@@ -920,8 +914,7 @@ function buildNoteHtmlWithImages(noteText, images){
       const img = byNum[parseInt(numStr, 10)];
       if(!img) return match;
       const widthPx = imageWidthPxFor(img);
-      // 사진은 별도의 블록으로 분리해서 2단 레이아웃에서도 폭 전체를 쓰도록(column-span) 해요
-      return `</div><div style="break-inside:avoid;column-span:all;margin:10px 0">`
+      return `</div><div style="break-inside:avoid;margin:10px 0">`
         + `<img src="${img.dataUrl}" style="width:${widthPx}px;max-width:100%;height:auto;display:block;border-radius:10px;border:3px solid #fff;box-shadow:0 0 0 1px rgba(189,150,64,0.2)">`
         + `</div><div style="white-space:pre-wrap">`;
     });
@@ -938,8 +931,6 @@ function exportNoteAsPDF(){
   const noteText = document.getElementById('note-editor').value;
   const printDiv = document.getElementById('note-editor-print');
   printDiv.innerHTML = buildNoteHtmlWithImages(noteText, s.images);
-  // 노트가 어느 정도 길 때만 2단으로 — 짧은 노트까지 2단으로 나누면 오히려 어색해요
-  printDiv.classList.toggle('two-col', noteText.trim().length > 300);
 
   // 본문에 이미 [사진N]으로 삽입된 사진은 아래쪽 사진 갤러리에 중복으로 나오지 않도록 숨겨요
   const referencedNums = getReferencedImageNums(noteText);
