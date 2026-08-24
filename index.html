@@ -163,6 +163,21 @@ body::before{
   border-radius:10px;padding:3px 9px;font-size:10.5px;cursor:pointer;font-family:'NanumSquare','Nanum Gothic',sans-serif;
   z-index:2;
 }
+.note-image-drag-handle{
+  position:absolute;right:-2px;bottom:-2px;width:26px;height:26px;
+  cursor:nwse-resize;touch-action:none;z-index:3;
+  background:rgba(38,44,74,0.82);border:2px solid #fff;border-radius:8px 2px 8px 2px;
+}
+.note-image-drag-handle::before{
+  content:'';position:absolute;right:5px;bottom:5px;width:10px;height:10px;
+  border-right:2px solid #fff;border-bottom:2px solid #fff;border-radius:0 0 2px 0;
+}
+.note-image-num-badge{
+  position:absolute;top:6px;left:6px;background:rgba(255,255,255,0.92);color:#282d54;
+  font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px;z-index:2;
+}
+.print-hide-inline{display:inherit}
+@media print{ .print-hide-inline{display:none !important} }
 #image-lightbox{align-items:center;justify-content:center;background:rgba(20,20,30,0.82)}
 #image-lightbox img{max-width:92vw;max-height:88vh;border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,0.45)}
 #note-bible-search-box{margin-bottom:10px}
@@ -223,7 +238,7 @@ body::before{
   @page{ margin: 18mm 15mm; }
   body::before{display:none !important}
   .topbar, .detail-topbar, .fab, #toast, .modal-overlay, #note-bible-search-box, .note-toolbar{display:none !important}
-  .note-image-resize, .note-image-remove{display:none !important}
+  .note-image-resize, .note-image-remove, .note-image-drag-handle{display:none !important}
   html, body, #app-body, #view-detail, .detail-scroll{
     overflow:visible !important; height:auto !important; display:block !important; background:#fff !important;
   }
@@ -236,7 +251,7 @@ body::before{
     font-family:'NanumSquare','Nanum Gothic',sans-serif; font-size:13.5px; line-height:1.85; color:#000;
   }
   #note-editor-print.two-col{
-    column-count:2; column-gap:26px; column-rule:1px solid #e5ddc5;
+    column-count:2; column-gap:26px; column-rule:1px solid #e5ddc5; column-fill:auto;
   }
   .note-image-item{max-width:100% !important; break-inside:avoid !important; page-break-inside:avoid !important; column-span:all}
   .note-image-thumb{box-shadow:none !important; border:1px solid #ddd !important}
@@ -294,7 +309,7 @@ body::before{
         <div class="note-toolbar">
           <button class="note-bible-toggle" onclick="toggleNoteBibleSearch()">📖 말씀 검색</button>
           <button class="note-save-btn" onclick="saveNoteManually()">💾 저장</button>
-          <button class="note-image-btn" onclick="document.getElementById('note-image-input').click()">🖼️ 사진 추가</button>
+          <button class="note-image-btn" title="커서 위치에 사진이 삽입돼요" onclick="document.getElementById('note-image-input').click()">🖼️ 사진 추가</button>
           <input type="file" id="note-image-input" accept="image/*" multiple class="hidden" onchange="handleNoteImageSelect(event)">
         </div>
         <div class="bible-search-box hidden" id="note-bible-search-box">
@@ -659,10 +674,17 @@ function saveNoteNow(){
 // ── 노트 이미지 첨부 ──
 function compressImageFile(file){
   return new Promise((resolve, reject)=>{
+    // 일부 사진 형식(HEIC 등)이나 손상된 파일은 로드 이벤트 자체가 안 일어날 수 있어서,
+    // 타임아웃을 걸어 특정 사진에서 무한 대기하지 않고 다음 사진으로 넘어가게 해요.
+    const timeoutId = setTimeout(()=>{
+      reject(new Error('이미지 처리 시간이 초과됐어요'));
+    }, 12000);
+
     const reader = new FileReader();
     reader.onload = e=>{
       const img = new Image();
       img.onload = ()=>{
+        clearTimeout(timeoutId);
         const maxDim = 1000;
         let w = img.width, h = img.height;
         if(w > h && w > maxDim){ h = Math.round(h * maxDim / w); w = maxDim; }
@@ -672,10 +694,16 @@ function compressImageFile(file){
         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
         resolve(canvas.toDataURL('image/jpeg', 0.72));
       };
-      img.onerror = ()=>reject(new Error('이미지를 읽을 수 없어요'));
+      img.onerror = ()=>{
+        clearTimeout(timeoutId);
+        reject(new Error('지원하지 않는 이미지 형식일 수 있어요'));
+      };
       img.src = e.target.result;
     };
-    reader.onerror = ()=>reject(new Error('파일을 읽을 수 없어요'));
+    reader.onerror = ()=>{
+      clearTimeout(timeoutId);
+      reject(new Error('파일을 읽을 수 없어요'));
+    };
     reader.readAsDataURL(file);
   });
 }
@@ -688,28 +716,50 @@ async function handleNoteImageSelect(event){
   if(!s) return;
   if(!s.images) s.images = [];
 
+  const textarea = document.getElementById('note-editor');
+  let cursorPos = textarea.selectionStart ?? textarea.value.length;
+
   let addedCount = 0;
+  let failedCount = 0;
   for(const file of files){
+    if(file.size > 25 * 1024 * 1024){ // 25MB 초과는 처리하지 않고 건너뜀
+      failedCount++;
+      continue;
+    }
     try{
       const dataUrl = await compressImageFile(file);
-      s.images.push({ id: genId(), dataUrl });
+      const num = s.images.reduce((max, i)=>Math.max(max, i.num || 0), 0) + 1;
+      s.images.push({ id: genId(), dataUrl, num, size: 'md' });
+      // 커서 위치에 [사진N] 표시를 남겨서 본문 어디에 넣었는지 알 수 있게 해요
+      const marker = `[사진${num}]`;
+      const before = textarea.value.slice(0, cursorPos);
+      const after = textarea.value.slice(cursorPos);
+      textarea.value = before + marker + after;
+      cursorPos += marker.length;
       addedCount++;
     }catch(e){
       console.error(e);
-      showToast('⚠️ 이미지를 처리하지 못했어요');
+      failedCount++;
     }
+  }
+  if(failedCount){
+    showToast(addedCount ? `⚠️ ${failedCount}장은 처리하지 못했어요` : '⚠️ 이미지를 처리하지 못했어요');
   }
   if(!addedCount) return;
 
+  textarea.selectionStart = textarea.selectionEnd = cursorPos;
+  autoGrowTextarea(textarea);
+  s.note = textarea.value;
   s.updatedAt = Date.now();
   try{
     saveSermonsToStorage();
-    showToast(addedCount > 1 ? `✓ 사진 ${addedCount}장이 추가됐어요` : '✓ 사진이 추가됐어요');
+    if(!failedCount) showToast(addedCount > 1 ? `✓ 사진 ${addedCount}장을 본문에 넣었어요` : '✓ 사진을 본문에 넣었어요');
   }catch(e){
     console.error(e);
     s.images.splice(s.images.length - addedCount, addedCount); // 저장 실패분 롤백
     showToast('⚠️ 저장공간이 부족해요. 기존 사진을 정리한 뒤 다시 시도해주세요');
   }
+  document.getElementById('note-save-status').textContent = '✓ 저장됨';
   renderNoteImages(s);
 }
 
@@ -727,13 +777,24 @@ function renderNoteImages(s){
   wrap.classList.remove('hidden');
   wrap.innerHTML = s.images.map(img=>{
     const size = img.size || 'md';
-    const width = IMAGE_SIZE_PRESETS[size] || IMAGE_SIZE_PRESETS.md;
-    const itemStyle = size === 'full' ? 'flex-basis:100%;max-width:100%' : `width:${width};max-width:100%`;
+    let itemStyle, label;
+    if(size === 'custom' && img.customWidth){
+      itemStyle = `width:${img.customWidth}px;max-width:100%`;
+      label = `${img.customWidth}px`;
+    } else if(size === 'full'){
+      itemStyle = 'flex-basis:100%;max-width:100%';
+      label = IMAGE_SIZE_LABELS.full;
+    } else {
+      itemStyle = `width:${IMAGE_SIZE_PRESETS[size] || IMAGE_SIZE_PRESETS.md};max-width:100%`;
+      label = IMAGE_SIZE_LABELS[size] || IMAGE_SIZE_LABELS.md;
+    }
     return `
-    <div class="note-image-item" style="${itemStyle}">
+    <div class="note-image-item" data-num="${img.num || ''}" style="${itemStyle}">
       <img class="note-image-thumb" src="${img.dataUrl}" onclick="openImageLightbox('${img.id}')">
-      <button class="note-image-resize" onclick="event.stopPropagation();cycleImageSize('${img.id}')" title="크기 조절">⤢ ${IMAGE_SIZE_LABELS[size]}</button>
+      ${img.num ? `<div class="note-image-num-badge">사진${img.num}</div>` : ''}
+      <button class="note-image-resize" onclick="event.stopPropagation();cycleImageSize('${img.id}')" title="크기 단계 전환">⤢ ${label}</button>
       <button class="note-image-remove" onclick="event.stopPropagation();removeNoteImage('${img.id}')">✕</button>
+      <div class="note-image-drag-handle" data-img-id="${img.id}" title="드래그해서 크기 조절"></div>
     </div>
   `;
   }).join('');
@@ -743,19 +804,80 @@ function cycleImageSize(imgId){
   const s = sermons.find(x=>x.id===currentSermonId);
   const img = s && s.images && s.images.find(i=>i.id===imgId);
   if(!img) return;
-  const curIdx = IMAGE_SIZE_ORDER.indexOf(img.size || 'md');
-  img.size = IMAGE_SIZE_ORDER[(curIdx + 1) % IMAGE_SIZE_ORDER.length];
+  if((img.size || 'md') === 'custom'){
+    img.size = 'sm'; // 직접 드래그로 조절한 뒤엔 처음(S)부터 다시 순환
+  } else {
+    const curIdx = IMAGE_SIZE_ORDER.indexOf(img.size || 'md');
+    img.size = IMAGE_SIZE_ORDER[(curIdx + 1) % IMAGE_SIZE_ORDER.length];
+  }
+  delete img.customWidth;
   s.updatedAt = Date.now();
   saveSermonsToStorage();
   renderNoteImages(s);
 }
 
+// ── 사진 드래그로 크기 조절 ──
+function startImageDragResize(e){
+  const handle = e.target.closest('.note-image-drag-handle');
+  if(!handle) return;
+  e.preventDefault();
+  const imgId = handle.dataset.imgId;
+  const item = handle.closest('.note-image-item');
+  const gallery = document.getElementById('note-image-gallery');
+  if(!item || !gallery) return;
+
+  handle.setPointerCapture(e.pointerId);
+  const startX = e.clientX;
+  const startWidth = item.getBoundingClientRect().width;
+  const minWidth = 80;
+  const maxWidth = gallery.getBoundingClientRect().width;
+
+  function onMove(ev){
+    const newWidth = Math.round(Math.max(minWidth, Math.min(maxWidth, startWidth + (ev.clientX - startX))));
+    item.style.width = newWidth + 'px';
+    item.style.flexBasis = 'auto';
+    item.style.maxWidth = '100%';
+  }
+  function onUp(){
+    handle.removeEventListener('pointermove', onMove);
+    handle.removeEventListener('pointerup', onUp);
+    const finalWidth = Math.round(item.getBoundingClientRect().width);
+    const s = sermons.find(x=>x.id===currentSermonId);
+    const img = s && s.images && s.images.find(i=>i.id===imgId);
+    if(img){
+      img.customWidth = finalWidth;
+      img.size = 'custom';
+      s.updatedAt = Date.now();
+      saveSermonsToStorage();
+      renderNoteImages(s);
+    }
+  }
+  handle.addEventListener('pointermove', onMove);
+  handle.addEventListener('pointerup', onUp, { once:true });
+}
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  const gallery = document.getElementById('note-image-gallery');
+  if(gallery) gallery.addEventListener('pointerdown', startImageDragResize);
+});
+
 function removeNoteImage(imgId){
   const s = sermons.find(x=>x.id===currentSermonId);
   if(!s || !s.images) return;
+  const img = s.images.find(i=>i.id===imgId);
   if(!confirm('이 사진을 삭제할까요?')) return;
   s.images = s.images.filter(i=>i.id!==imgId);
   s.updatedAt = Date.now();
+  // 본문에 남아있는 [사진N] 표시도 함께 지워줘요
+  if(img && img.num){
+    const textarea = document.getElementById('note-editor');
+    const marker = `[사진${img.num}]`;
+    if(textarea.value.includes(marker)){
+      textarea.value = textarea.value.replace(marker, '');
+      s.note = textarea.value;
+      autoGrowTextarea(textarea);
+    }
+  }
   saveSermonsToStorage();
   renderNoteImages(s);
 }
@@ -769,18 +891,56 @@ function openImageLightbox(imgId){
 }
 
 // ── PDF / 이미지 내보내기 ──
+function imageWidthPxFor(img){
+  const size = img.size || 'md';
+  return size==='custom' && img.customWidth ? img.customWidth
+    : size==='sm' ? 130 : size==='lg' ? 300 : size==='full' ? 580 : 200;
+}
+
+function getReferencedImageNums(noteText){
+  return new Set([...noteText.matchAll(/\[사진(\d+)\]/g)].map(m=>parseInt(m[1], 10)));
+}
+
+// 노트 본문의 [사진N] 표시를 실제 이미지로 바꿔서, 내보낼 때는 본문 안에 그대로 삽입되도록 해요
+function buildNoteHtmlWithImages(noteText, images){
+  const byNum = {};
+  (images || []).forEach(img=>{ if(img.num) byNum[img.num] = img; });
+  const escaped = escapeHtml(noteText);
+  return escaped.replace(/\[사진(\d+)\]/g, (match, numStr)=>{
+    const img = byNum[parseInt(numStr, 10)];
+    if(!img) return match;
+    const widthPx = imageWidthPxFor(img);
+    return `<br><img src="${img.dataUrl}" style="width:${widthPx}px;max-width:100%;height:auto;display:block;margin:8px 0;border-radius:10px;border:3px solid #fff;box-shadow:0 0 0 1px rgba(189,150,64,0.2)"><br>`;
+  });
+}
+
 function exportNoteAsPDF(){
   if(!currentSermonId){ showToast('설교를 먼저 선택해주세요'); return; }
+  const s = sermons.find(x=>x.id===currentSermonId);
+  if(!s) return;
   // 텍스트영역(textarea)은 인쇄 시 페이지를 넘어 나뉘어 인쇄되지 않아서,
-  // 인쇄 전용 일반 텍스트로 복사해두면 노트가 페이지 경계에서 자연스럽게 이어져요.
+  // 인쇄 전용 영역으로 복사해두면 노트가 페이지 경계에서 자연스럽게 이어져요.
   const noteText = document.getElementById('note-editor').value;
   const printDiv = document.getElementById('note-editor-print');
-  printDiv.textContent = noteText;
+  printDiv.innerHTML = buildNoteHtmlWithImages(noteText, s.images);
   // 노트가 어느 정도 길 때만 2단으로 — 짧은 노트까지 2단으로 나누면 오히려 어색해요
   printDiv.classList.toggle('two-col', noteText.trim().length > 300);
+
+  // 본문에 이미 [사진N]으로 삽입된 사진은 아래쪽 사진 갤러리에 중복으로 나오지 않도록 숨겨요
+  const referencedNums = getReferencedImageNums(noteText);
+  document.querySelectorAll('#note-image-gallery .note-image-item').forEach(item=>{
+    const n = parseInt(item.dataset.num, 10);
+    item.classList.toggle('print-hide-inline', referencedNums.has(n));
+  });
+
   showToast('인쇄 대화상자에서 "PDF로 저장"을 선택해주세요');
   setTimeout(()=>window.print(), 400);
 }
+
+// 인쇄가 끝나면(취소 포함) 갤러리에 임시로 씌워둔 숨김 처리를 되돌려요
+window.addEventListener('afterprint', ()=>{
+  document.querySelectorAll('.print-hide-inline').forEach(el=>el.classList.remove('print-hide-inline'));
+});
 
 function buildExportContainer(s){
   const container = document.createElement('div');
@@ -793,13 +953,14 @@ function buildExportContainer(s){
        </div>`
     : '';
 
-  const imagesHtml = (s.images && s.images.length)
+  const noteText = s.note || '';
+  const referencedNums = getReferencedImageNums(noteText);
+  const orphanImages = (s.images || []).filter(img=>!referencedNums.has(img.num));
+  const noteHtml = noteText ? buildNoteHtmlWithImages(noteText, s.images) : '(작성한 노트가 없어요)';
+
+  const orphanImagesHtml = orphanImages.length
     ? `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:18px">
-         ${s.images.map(img=>{
-            const size = img.size || 'md';
-            const widthPx = size==='sm' ? 130 : size==='lg' ? 300 : size==='full' ? 580 : 200;
-            return `<img src="${img.dataUrl}" style="width:${widthPx}px;height:auto;display:block;border-radius:10px;border:3px solid #fff;box-shadow:0 0 0 1px rgba(189,150,64,0.2)">`;
-          }).join('')}
+         ${orphanImages.map(img=>`<img src="${img.dataUrl}" style="width:${imageWidthPxFor(img)}px;height:auto;display:block;border-radius:10px;border:3px solid #fff;box-shadow:0 0 0 1px rgba(189,150,64,0.2)">`).join('')}
        </div>`
     : '';
 
@@ -809,8 +970,8 @@ function buildExportContainer(s){
     <div style="font-size:13px;color:#7b81a3;margin-bottom:18px">${escapeHtml([s.preacher, s.series].filter(Boolean).join(' · '))}</div>
     ${scriptureHtml}
     <div style="font-size:13px;font-weight:800;color:#282d54;margin-bottom:8px">📝 나의 노트</div>
-    <div style="white-space:pre-wrap;font-size:14px;line-height:1.85">${escapeHtml(s.note||'(작성한 노트가 없어요)')}</div>
-    ${imagesHtml}
+    <div style="white-space:pre-wrap;font-size:14px;line-height:1.85">${noteHtml}</div>
+    ${orphanImagesHtml}
   `;
   document.body.appendChild(container);
   return container;
