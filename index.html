@@ -912,7 +912,13 @@ function buildNoteHtmlWithImages(noteText, images){
     const img = byNum[parseInt(numStr, 10)];
     if(!img) return match;
     const widthPx = imageWidthPxFor(img);
-    return `<br><img src="${img.dataUrl}" style="width:${widthPx}px;max-width:100%;height:auto;display:block;margin:8px 0;border-radius:10px;border:3px solid #fff;box-shadow:0 0 0 1px rgba(189,150,64,0.2)"><br>`;
+    const dottedLine = 'border-top:2px dotted #8b5cf6;margin:8px 0;width:100%';
+    return `<span style="display:block;margin:6px 0">`
+      + `<span style="color:#2f5fdb;font-weight:800;font-size:12.5px">[사진${numStr}]</span>`
+      + `<span style="display:block;${dottedLine}"></span>`
+      + `<img src="${img.dataUrl}" style="width:${widthPx}px;max-width:100%;height:auto;display:block;border-radius:10px;border:3px solid #fff;box-shadow:0 0 0 1px rgba(189,150,64,0.2)">`
+      + `<span style="display:block;${dottedLine}"></span>`
+      + `</span>`;
   });
 }
 
