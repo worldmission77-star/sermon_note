@@ -12,6 +12,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/moonspam/NanumSquare@2.0/nanumsquare.css">
 <link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700;800&display=swap" rel="stylesheet">
 <script src="bible-data.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
@@ -99,12 +100,14 @@ body::before{
 
 /* ── DETAIL VIEW ── */
 #view-detail{flex:1;display:flex;flex-direction:column;overflow:hidden}
-.detail-topbar{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);background:rgba(255,255,255,0.6);flex-shrink:0}
+.detail-topbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);background:rgba(255,255,255,0.6);flex-shrink:0}
 .back-btn{background:none;border:1px solid var(--border);border-radius:16px;padding:5px 12px;font-size:12px;color:var(--accent);cursor:pointer;font-family:'NanumSquare','Nanum Gothic',sans-serif}
 .back-btn:hover{background:var(--accent-light)}
 .detail-topbar .spacer{flex:1}
 .admin-edit-btn{background:none;border:1px solid var(--gold-soft);color:var(--gold-dark);border-radius:16px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:'NanumSquare','Nanum Gothic',sans-serif}
 .admin-edit-btn:hover{background:var(--gold-light)}
+.export-btn{background:none;border:1px solid var(--accent-soft);color:var(--accent);border-radius:16px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:'NanumSquare','Nanum Gothic',sans-serif}
+.export-btn:hover{background:var(--accent-light)}
 
 .detail-scroll{flex:1;overflow-y:auto;padding:16px 16px 90px}
 .sermon-header{margin-bottom:14px}
@@ -141,18 +144,23 @@ body::before{
 .note-image-btn:hover{background:var(--accent-light);color:var(--accent-dark)}
 
 .note-image-gallery{display:flex;flex-wrap:wrap;gap:14px;margin-top:16px}
-.note-image-item{position:relative;width:96px;height:96px}
+.note-image-item{position:relative}
 .note-image-thumb{
-  width:100%;height:100%;object-fit:cover;border-radius:12px;display:block;cursor:pointer;
+  width:100%;height:auto;display:block;border-radius:12px;cursor:pointer;
   border:3px solid rgba(255,255,255,0.85);
   box-shadow:0 0 0 1px rgba(189,150,64,0.18), 0 0 16px 4px rgba(189,150,64,0.22), 0 4px 12px rgba(40,45,84,0.16);
   transition:transform .15s;
 }
-.note-image-thumb:hover{transform:scale(1.03)}
+.note-image-thumb:hover{transform:scale(1.02)}
 .note-image-remove{
   position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;
   background:rgba(38,44,74,0.85);color:#fff;border:2px solid #fff;font-size:11px;line-height:1;
-  cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;z-index:2;
+}
+.note-image-resize{
+  position:absolute;left:6px;bottom:6px;background:rgba(38,44,74,0.72);color:#fff;border:none;
+  border-radius:10px;padding:3px 9px;font-size:10.5px;cursor:pointer;font-family:'NanumSquare','Nanum Gothic',sans-serif;
+  z-index:2;
 }
 #image-lightbox{align-items:center;justify-content:center;background:rgba(20,20,30,0.82)}
 #image-lightbox img{max-width:92vw;max-height:88vh;border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,0.45)}
@@ -208,6 +216,20 @@ body::before{
   opacity:0;pointer-events:none;transition:all .25s;z-index:200;white-space:nowrap;font-family:'NanumSquare','Nanum Gothic',sans-serif;
 }
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── 인쇄(PDF 저장)용 스타일 ── */
+@media print{
+  body::before{display:none !important}
+  .topbar, .detail-topbar, .fab, #toast, .modal-overlay, #note-bible-search-box, .note-toolbar{display:none !important}
+  html, body, #app-body, #view-detail, .detail-scroll{
+    overflow:visible !important; height:auto !important; display:block !important; background:#fff !important;
+  }
+  .detail-scroll{padding:10px 4px !important}
+  .sermon-card, .note-section, .scripture-box{box-shadow:none !important; backdrop-filter:none !important}
+  .note-section{border:1px solid #ddd !important}
+  #note-editor{border:none !important; color:#000 !important; overflow:visible !important}
+  .note-image-thumb{box-shadow:none !important; border:1px solid #ddd !important}
+}
 </style>
 </head>
 <body>
@@ -225,10 +247,10 @@ body::before{
     <div class="filter-bar">
       <input type="text" id="filter-text" placeholder="설교자·제목 검색" oninput="renderSermonList()">
       <select id="filter-series" onchange="renderSermonList()">
-        <option value="">예배 구분</option>
+        <option value="">전체 시리즈</option>
       </select>
-      <button class="backup-btn" onclick="exportData()" title="백업 다운로드">⬇</button>
-      <button class="backup-btn" onclick="document.getElementById('import-file-input').click()" title="백업 업로드">⬆</button>
+      <button class="backup-btn" onclick="exportData()" title="백업 내보내기">⬇</button>
+      <button class="backup-btn" onclick="document.getElementById('import-file-input').click()" title="백업 가져오기">⬆</button>
       <input type="file" id="import-file-input" accept="application/json" class="hidden" onchange="handleImportFile(event)">
     </div>
     <div class="scroll-area" id="sermon-list"></div>
@@ -238,6 +260,8 @@ body::before{
     <div class="detail-topbar">
       <button class="back-btn" onclick="closeDetail()">← 목록</button>
       <div class="spacer"></div>
+      <button class="export-btn" onclick="exportNoteAsPDF()">🖨️ PDF</button>
+      <button class="export-btn" onclick="exportNoteAsImage()">🖼️ 이미지</button>
       <button class="admin-edit-btn" id="detail-edit-btn" onclick="openSermonEditModal(currentSermonId)">✎ 설교정보 수정</button>
     </div>
     <div class="detail-scroll">
@@ -272,7 +296,7 @@ body::before{
           </div>
           <div class="bible-search-hint">검색하면 노트 커서 위치에 바로 삽입돼요</div>
         </div>
-        <textarea id="note-editor" placeholder="설교 말씀을 통해 나에게 하신 말씀을 적어봅니다." oninput="scheduleNoteSave();autoGrowTextarea(this)"></textarea>
+        <textarea id="note-editor" placeholder="설교를 들으며 마음에 남는 것을 자유롭게 적어보세요..." oninput="scheduleNoteSave();autoGrowTextarea(this)"></textarea>
         <div class="note-image-gallery hidden" id="note-image-gallery"></div>
       </div>
     </div>
@@ -301,8 +325,8 @@ body::before{
       </div>
       <div class="field-label">제목</div>
       <input type="text" class="form-input" id="edit-title" placeholder="설교 제목">
-      <div class="field-label">예배 구분</div>
-      <input type="text" class="form-input" id="edit-series" placeholder="예: 주일예배 / 저녁예배 / 새벽예배">
+      <div class="field-label">시리즈 (선택)</div>
+      <input type="text" class="form-input" id="edit-series" placeholder="예: 로마서 강해 1부">
 
       <div class="field-label">본문 말씀</div>
       <input type="text" class="form-input" id="edit-scripture-ref" placeholder="예: 로마서 8:28-30">
@@ -440,7 +464,7 @@ function updateSeriesFilterOptions(){
   const sel = document.getElementById('filter-series');
   const current = sel.value;
   const seriesSet = [...new Set(sermons.map(s=>s.series).filter(Boolean))];
-  sel.innerHTML = '<option value="">예배 구분</option>' +
+  sel.innerHTML = '<option value="">전체 시리즈</option>' +
     seriesSet.map(s=>`<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
   sel.value = seriesSet.includes(current) ? current : '';
 }
@@ -676,6 +700,10 @@ async function handleNoteImageSelect(event){
   renderNoteImages(s);
 }
 
+const IMAGE_SIZE_PRESETS = { sm:'110px', md:'170px', lg:'260px', full:'100%' };
+const IMAGE_SIZE_LABELS  = { sm:'S', md:'M', lg:'L', full:'전체' };
+const IMAGE_SIZE_ORDER   = ['sm','md','lg','full'];
+
 function renderNoteImages(s){
   const wrap = document.getElementById('note-image-gallery');
   if(!s || !s.images || !s.images.length){
@@ -684,12 +712,29 @@ function renderNoteImages(s){
     return;
   }
   wrap.classList.remove('hidden');
-  wrap.innerHTML = s.images.map(img=>`
-    <div class="note-image-item">
+  wrap.innerHTML = s.images.map(img=>{
+    const size = img.size || 'md';
+    const width = IMAGE_SIZE_PRESETS[size] || IMAGE_SIZE_PRESETS.md;
+    const itemStyle = size === 'full' ? 'flex-basis:100%;max-width:100%' : `width:${width};max-width:100%`;
+    return `
+    <div class="note-image-item" style="${itemStyle}">
       <img class="note-image-thumb" src="${img.dataUrl}" onclick="openImageLightbox('${img.id}')">
+      <button class="note-image-resize" onclick="event.stopPropagation();cycleImageSize('${img.id}')" title="크기 조절">⤢ ${IMAGE_SIZE_LABELS[size]}</button>
       <button class="note-image-remove" onclick="event.stopPropagation();removeNoteImage('${img.id}')">✕</button>
     </div>
-  `).join('');
+  `;
+  }).join('');
+}
+
+function cycleImageSize(imgId){
+  const s = sermons.find(x=>x.id===currentSermonId);
+  const img = s && s.images && s.images.find(i=>i.id===imgId);
+  if(!img) return;
+  const curIdx = IMAGE_SIZE_ORDER.indexOf(img.size || 'md');
+  img.size = IMAGE_SIZE_ORDER[(curIdx + 1) % IMAGE_SIZE_ORDER.length];
+  s.updatedAt = Date.now();
+  saveSermonsToStorage();
+  renderNoteImages(s);
 }
 
 function removeNoteImage(imgId){
@@ -708,6 +753,72 @@ function openImageLightbox(imgId){
   if(!img) return;
   document.getElementById('lightbox-img').src = img.dataUrl;
   openModal('image-lightbox');
+}
+
+// ── PDF / 이미지 내보내기 ──
+function exportNoteAsPDF(){
+  if(!currentSermonId){ showToast('설교를 먼저 선택해주세요'); return; }
+  showToast('인쇄 대화상자에서 "PDF로 저장"을 선택해주세요');
+  setTimeout(()=>window.print(), 400);
+}
+
+function buildExportContainer(s){
+  const container = document.createElement('div');
+  container.style.cssText = 'position:fixed;left:-9999px;top:0;width:640px;background:#fdfaf3;padding:30px;font-family:NanumSquare,Nanum Gothic,sans-serif;color:#262c4a;box-sizing:border-box;';
+
+  const scriptureHtml = s.scriptureHtml
+    ? `<div style="background:#faf4e2;border:1px solid #f0e1b4;border-radius:12px;padding:16px 18px;margin-bottom:18px">
+         <div style="font-size:13px;font-weight:800;color:#96742c;margin-bottom:8px">${escapeHtml(s.scriptureRef||'')}</div>
+         ${s.scriptureHtml}
+       </div>`
+    : '';
+
+  const imagesHtml = (s.images && s.images.length)
+    ? `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:18px">
+         ${s.images.map(img=>`<img src="${img.dataUrl}" style="width:150px;height:150px;object-fit:cover;border-radius:10px;border:3px solid #fff;box-shadow:0 0 0 1px rgba(189,150,64,0.2)">`).join('')}
+       </div>`
+    : '';
+
+  container.innerHTML = `
+    <div style="font-size:12px;color:#96742c;font-weight:700;margin-bottom:6px">${escapeHtml(formatDateDisplay(s.date))}</div>
+    <div style="font-size:23px;font-weight:800;margin-bottom:6px;line-height:1.4">${escapeHtml(s.title||'(제목 없음)')}</div>
+    <div style="font-size:13px;color:#7b81a3;margin-bottom:18px">${escapeHtml([s.preacher, s.series].filter(Boolean).join(' · '))}</div>
+    ${scriptureHtml}
+    <div style="font-size:13px;font-weight:800;color:#282d54;margin-bottom:8px">📝 나의 노트</div>
+    <div style="white-space:pre-wrap;font-size:14px;line-height:1.85">${escapeHtml(s.note||'(작성한 노트가 없어요)')}</div>
+    ${imagesHtml}
+  `;
+  document.body.appendChild(container);
+  return container;
+}
+
+async function exportNoteAsImage(){
+  if(!currentSermonId){ showToast('설교를 먼저 선택해주세요'); return; }
+  const s = sermons.find(x=>x.id===currentSermonId);
+  if(!s) return;
+  if(typeof html2canvas === 'undefined'){
+    showToast('⚠️ 이미지 기능을 불러오지 못했어요 (인터넷 연결을 확인해주세요)');
+    return;
+  }
+  showToast('이미지 생성 중...');
+  const container = buildExportContainer(s);
+  try{
+    const canvas = await html2canvas(container, { backgroundColor:'#fdfaf3', scale:2 });
+    const url = canvas.toDataURL('image/png');
+    const a = document.createElement('a');
+    const safeTitle = (s.title || '설교노트').replace(/[\\/:*?"<>|]/g,'').slice(0,40);
+    a.href = url;
+    a.download = `${safeTitle}_${s.date||''}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    showToast('✓ 이미지로 저장됐어요');
+  }catch(e){
+    console.error(e);
+    showToast('⚠️ 이미지 생성에 실패했어요');
+  }finally{
+    document.body.removeChild(container);
+  }
 }
 
 // ── 설교 등록/수정 ──
