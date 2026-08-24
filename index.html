@@ -220,24 +220,29 @@ body::before{
 
 /* ── 인쇄(PDF 저장)용 스타일 ── */
 @media print{
+  @page{ margin: 18mm 15mm; }
   body::before{display:none !important}
   .topbar, .detail-topbar, .fab, #toast, .modal-overlay, #note-bible-search-box, .note-toolbar{display:none !important}
   .note-image-resize, .note-image-remove{display:none !important}
   html, body, #app-body, #view-detail, .detail-scroll{
     overflow:visible !important; height:auto !important; display:block !important; background:#fff !important;
   }
-  .detail-scroll{padding:10px 4px !important}
+  .detail-scroll{padding:22px 26px !important}
   .sermon-card, .note-section, .scripture-box{box-shadow:none !important; backdrop-filter:none !important}
-  .note-section{border:1px solid #ddd !important; break-inside:auto !important; page-break-inside:auto !important}
+  .note-section{border:1px solid #ddd !important; break-inside:auto !important; page-break-inside:auto !important; padding:18px 20px !important}
   #note-editor{display:none !important}
   #note-editor-print{
     display:block !important; white-space:pre-wrap; word-break:break-word;
-    font-family:'NanumSquare','Nanum Gothic',sans-serif; font-size:14px; line-height:1.85; color:#000;
+    font-family:'NanumSquare','Nanum Gothic',sans-serif; font-size:13.5px; line-height:1.85; color:#000;
   }
-  .note-image-item{max-width:100% !important; break-inside:avoid !important; page-break-inside:avoid !important}
+  #note-editor-print.two-col{
+    column-count:2; column-gap:26px; column-rule:1px solid #e5ddc5;
+  }
+  .note-image-item{max-width:100% !important; break-inside:avoid !important; page-break-inside:avoid !important; column-span:all}
   .note-image-thumb{box-shadow:none !important; border:1px solid #ddd !important}
 }
 </style>
+
 </head>
 <body>
 
@@ -769,7 +774,10 @@ function exportNoteAsPDF(){
   // 텍스트영역(textarea)은 인쇄 시 페이지를 넘어 나뉘어 인쇄되지 않아서,
   // 인쇄 전용 일반 텍스트로 복사해두면 노트가 페이지 경계에서 자연스럽게 이어져요.
   const noteText = document.getElementById('note-editor').value;
-  document.getElementById('note-editor-print').textContent = noteText;
+  const printDiv = document.getElementById('note-editor-print');
+  printDiv.textContent = noteText;
+  // 노트가 어느 정도 길 때만 2단으로 — 짧은 노트까지 2단으로 나누면 오히려 어색해요
+  printDiv.classList.toggle('two-col', noteText.trim().length > 300);
   showToast('인쇄 대화상자에서 "PDF로 저장"을 선택해주세요');
   setTimeout(()=>window.print(), 400);
 }
