@@ -134,6 +134,7 @@ body::before{
   background:transparent;
 }
 #note-editor::placeholder{color:var(--dim)}
+#note-editor-print{display:none}
 .note-toolbar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
 .note-bible-toggle{background:none;border:1px solid var(--gold-soft);color:var(--gold-dark);border-radius:14px;padding:4px 11px;font-size:11px;cursor:pointer;font-family:'NanumSquare','Nanum Gothic',sans-serif}
 .note-bible-toggle:hover{background:var(--gold-light)}
@@ -221,13 +222,19 @@ body::before{
 @media print{
   body::before{display:none !important}
   .topbar, .detail-topbar, .fab, #toast, .modal-overlay, #note-bible-search-box, .note-toolbar{display:none !important}
+  .note-image-resize, .note-image-remove{display:none !important}
   html, body, #app-body, #view-detail, .detail-scroll{
     overflow:visible !important; height:auto !important; display:block !important; background:#fff !important;
   }
   .detail-scroll{padding:10px 4px !important}
   .sermon-card, .note-section, .scripture-box{box-shadow:none !important; backdrop-filter:none !important}
-  .note-section{border:1px solid #ddd !important}
-  #note-editor{border:none !important; color:#000 !important; overflow:visible !important}
+  .note-section{border:1px solid #ddd !important; break-inside:auto !important; page-break-inside:auto !important}
+  #note-editor{display:none !important}
+  #note-editor-print{
+    display:block !important; white-space:pre-wrap; word-break:break-word;
+    font-family:'NanumSquare','Nanum Gothic',sans-serif; font-size:14px; line-height:1.85; color:#000;
+  }
+  .note-image-item{max-width:100% !important; break-inside:avoid !important; page-break-inside:avoid !important}
   .note-image-thumb{box-shadow:none !important; border:1px solid #ddd !important}
 }
 </style>
@@ -297,6 +304,7 @@ body::before{
           <div class="bible-search-hint">검색하면 노트 커서 위치에 바로 삽입돼요</div>
         </div>
         <textarea id="note-editor" placeholder="설교를 들으며 마음에 남는 것을 자유롭게 적어보세요..." oninput="scheduleNoteSave();autoGrowTextarea(this)"></textarea>
+        <div id="note-editor-print"></div>
         <div class="note-image-gallery hidden" id="note-image-gallery"></div>
       </div>
     </div>
@@ -758,6 +766,10 @@ function openImageLightbox(imgId){
 // ── PDF / 이미지 내보내기 ──
 function exportNoteAsPDF(){
   if(!currentSermonId){ showToast('설교를 먼저 선택해주세요'); return; }
+  // 텍스트영역(textarea)은 인쇄 시 페이지를 넘어 나뉘어 인쇄되지 않아서,
+  // 인쇄 전용 일반 텍스트로 복사해두면 노트가 페이지 경계에서 자연스럽게 이어져요.
+  const noteText = document.getElementById('note-editor').value;
+  document.getElementById('note-editor-print').textContent = noteText;
   showToast('인쇄 대화상자에서 "PDF로 저장"을 선택해주세요');
   setTimeout(()=>window.print(), 400);
 }
