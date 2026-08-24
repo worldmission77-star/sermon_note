@@ -249,9 +249,11 @@ body::before{
   #note-editor-print{
     display:block !important; white-space:pre-wrap; word-break:break-word;
     font-family:'NanumSquare','Nanum Gothic',sans-serif; font-size:13.5px; line-height:1.85; color:#000;
+    break-inside:auto !important; page-break-inside:auto !important;
   }
   #note-editor-print.two-col{
     column-count:2; column-gap:26px; column-rule:1px solid #e5ddc5; column-fill:auto;
+    break-inside:auto !important; page-break-inside:auto !important;
   }
   .note-image-item{max-width:100% !important; break-inside:avoid !important; page-break-inside:avoid !important; column-span:all}
   .note-image-thumb{box-shadow:none !important; border:1px solid #ddd !important}
