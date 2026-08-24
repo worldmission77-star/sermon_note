@@ -787,7 +787,11 @@ function buildExportContainer(s){
 
   const imagesHtml = (s.images && s.images.length)
     ? `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:18px">
-         ${s.images.map(img=>`<img src="${img.dataUrl}" style="width:150px;height:150px;object-fit:cover;border-radius:10px;border:3px solid #fff;box-shadow:0 0 0 1px rgba(189,150,64,0.2)">`).join('')}
+         ${s.images.map(img=>{
+            const size = img.size || 'md';
+            const widthPx = size==='sm' ? 130 : size==='lg' ? 300 : size==='full' ? 580 : 200;
+            return `<img src="${img.dataUrl}" style="width:${widthPx}px;height:auto;display:block;border-radius:10px;border:3px solid #fff;box-shadow:0 0 0 1px rgba(189,150,64,0.2)">`;
+          }).join('')}
        </div>`
     : '';
 
