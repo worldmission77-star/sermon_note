@@ -87,6 +87,7 @@ body::before{
 .sermon-date{font-size:11px;color:var(--gold-dark);font-weight:700;letter-spacing:0.5px}
 .sermon-series{font-size:10px;color:var(--muted);background:var(--accent-light);padding:2px 8px;border-radius:10px}
 .sermon-title{font-size:15px;font-weight:800;color:var(--ink);margin-bottom:3px;line-height:1.35}
+.title-ref{font-weight:700;color:var(--gold-dark);font-size:0.85em}
 .sermon-meta{font-size:12px;color:var(--muted)}
 
 /* ── FAB ── */
@@ -276,7 +277,7 @@ body::before{
     <div class="filter-bar">
       <input type="text" id="filter-text" placeholder="설교자·제목 검색" oninput="renderSermonList()">
       <select id="filter-series" onchange="renderSermonList()">
-        <option value="">전체 시리즈</option>
+        <option value="">전체 구분</option>
       </select>
       <button class="backup-btn" onclick="exportData()" title="백업 내보내기">⬇</button>
       <button class="backup-btn" onclick="document.getElementById('import-file-input').click()" title="백업 가져오기">⬆</button>
@@ -355,8 +356,8 @@ body::before{
       </div>
       <div class="field-label">제목</div>
       <input type="text" class="form-input" id="edit-title" placeholder="설교 제목">
-      <div class="field-label">시리즈 (선택)</div>
-      <input type="text" class="form-input" id="edit-series" placeholder="예: 로마서 강해 1부">
+      <div class="field-label">구분 (선택)</div>
+      <input type="text" class="form-input" id="edit-series" placeholder="예: 주일예배, 수요기도회">
 
       <div class="field-label">본문 말씀</div>
       <input type="text" class="form-input" id="edit-scripture-ref" placeholder="예: 로마서 8:28-30">
@@ -494,7 +495,7 @@ function updateSeriesFilterOptions(){
   const sel = document.getElementById('filter-series');
   const current = sel.value;
   const seriesSet = [...new Set(sermons.map(s=>s.series).filter(Boolean))];
-  sel.innerHTML = '<option value="">전체 시리즈</option>' +
+  sel.innerHTML = '<option value="">전체 구분</option>' +
     seriesSet.map(s=>`<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
   sel.value = seriesSet.includes(current) ? current : '';
 }
@@ -518,7 +519,7 @@ function renderSermonList(){
         <span class="sermon-date">${formatDateDisplay(s.date)}</span>
         ${s.series?`<span class="sermon-series">${escapeHtml(s.series)}</span>`:''}
       </div>
-      <div class="sermon-title">${escapeHtml(s.title||'(제목 없음)')}</div>
+      <div class="sermon-title">${escapeHtml(s.title||'(제목 없음)')}${s.scriptureRef ? ` <span class="title-ref">(${escapeHtml(s.scriptureRef)})</span>` : ''}</div>
       <div class="sermon-meta">${escapeHtml(s.preacher||'')}</div>
     </div>
   `).join('');
@@ -544,7 +545,7 @@ function openDetail(id){
 
 function renderDetailHeader(s){
   document.getElementById('detail-date').textContent = formatDateDisplay(s.date);
-  document.getElementById('detail-title').textContent = s.title || '(제목 없음)';
+  document.getElementById('detail-title').innerHTML = escapeHtml(s.title || '(제목 없음)') + (s.scriptureRef ? ` <span class="title-ref">(${escapeHtml(s.scriptureRef)})</span>` : '');
   document.getElementById('detail-meta').textContent = [s.preacher, s.series].filter(Boolean).join(' · ');
   const box = document.getElementById('detail-scripture-box');
   if(s.scriptureHtml){
@@ -907,7 +908,6 @@ function getReferencedImageNums(noteText){
 function buildNoteHtmlWithImages(noteText, images){
   const byNum = {};
   (images || []).forEach(img=>{ if(img.num) byNum[img.num] = img; });
-  const dottedLine = 'border-top:2px dotted #8b5cf6;margin:8px 0;width:100%';
 
   // 문단(빈 줄) 단위로 나눠서 각 문단이 페이지/단 경계에서 어색하게 끊기지 않도록 해요.
   const paragraphs = noteText.split(/\n{2,}/);
@@ -921,10 +921,7 @@ function buildNoteHtmlWithImages(noteText, images){
       const widthPx = imageWidthPxFor(img);
       // 사진은 별도의 블록으로 분리해서 2단 레이아웃에서도 폭 전체를 쓰도록(column-span) 해요
       return `</div><div style="break-inside:avoid;column-span:all;margin:10px 0">`
-        + `<span style="color:#2f5fdb;font-weight:800;font-size:12.5px">[사진${numStr}]</span>`
-        + `<span style="display:block;${dottedLine}"></span>`
         + `<img src="${img.dataUrl}" style="width:${widthPx}px;max-width:100%;height:auto;display:block;border-radius:10px;border:3px solid #fff;box-shadow:0 0 0 1px rgba(189,150,64,0.2)">`
-        + `<span style="display:block;${dottedLine}"></span>`
         + `</div><div style="break-inside:avoid;white-space:pre-wrap">`;
     });
     return `<div style="break-inside:avoid;white-space:pre-wrap;margin-bottom:14px">${withImages}</div>`;
