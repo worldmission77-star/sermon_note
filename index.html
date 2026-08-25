@@ -1217,10 +1217,10 @@ async function mergeSelectedToPDF(){
 
 function buildExportContainer(s){
   const container = document.createElement('div');
-  container.style.cssText = 'position:fixed;left:-9999px;top:0;width:500px;background:#fdfaf3;padding:34px;font-family:NanumSquare,Nanum Gothic,sans-serif;color:#262c4a;box-sizing:border-box;';
+  container.style.cssText = 'position:fixed;left:-9999px;top:0;width:480px;background:#fdfaf3;padding:22px;font-family:NanumSquare,Nanum Gothic,sans-serif;color:#262c4a;box-sizing:border-box;';
 
   const scriptureHtml = s.scriptureHtml
-    ? `<div style="background:#faf4e2;border:1px solid #f0e1b4;border-radius:12px;padding:18px 20px;margin-bottom:18px">
+    ? `<div style="background:#faf4e2;border:1px solid #f0e1b4;border-radius:12px;padding:16px 18px;margin-bottom:18px">
          <div style="font-size:16px;font-weight:800;color:#96742c;margin-bottom:8px">${escapeHtml(s.scriptureRef||'')}</div>
          ${s.scriptureHtml}
        </div>`
@@ -1233,7 +1233,7 @@ function buildExportContainer(s){
 
   const orphanImagesHtml = orphanImages.length
     ? `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:18px">
-         ${orphanImages.map(img=>`<img src="${img.dataUrl}" style="width:${imageWidthPxFor(img)}px;height:auto;display:block;border-radius:10px;border:3px solid #fff;box-shadow:0 0 0 1px rgba(189,150,64,0.2)">`).join('')}
+         ${orphanImages.map(img=>`<img src="${img.dataUrl}" style="width:${Math.min(imageWidthPxFor(img), 436)}px;height:auto;display:block;border-radius:10px;border:3px solid #fff;box-shadow:0 0 0 1px rgba(189,150,64,0.2)">`).join('')}
        </div>`
     : '';
 
