@@ -13,6 +13,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700;800&display=swap" rel="stylesheet">
 <script src="bible-data.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
@@ -149,9 +150,6 @@ body::before{
   background:transparent;
 }
 #note-editor::placeholder{color:var(--dim)}
-#note-editor-print{display:none}
-#sermon-header-print{display:none}
-#batch-print-root{display:none}
 .note-toolbar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
 .note-bible-toggle{background:none;border:1px solid var(--gold-soft);color:var(--gold-dark);border-radius:14px;padding:4px 11px;font-size:11px;cursor:pointer;font-family:'NanumSquare','Nanum Gothic',sans-serif}
 .note-bible-toggle:hover{background:var(--gold-light)}
@@ -252,49 +250,6 @@ body::before{
 }
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
-/* ── 인쇄(PDF 저장)용 스타일 ── */
-@media print{
-  @page{ size: A4 landscape; margin: 3mm 3mm 8mm 3mm; }
-  body::before{display:none !important}
-  .topbar, .detail-topbar, .fab, #toast, .modal-overlay, #note-bible-search-box, .note-toolbar{display:none !important}
-  .note-image-resize, .note-image-remove, .note-image-drag-handle{display:none !important}
-  html, body, #app-body, #view-detail, .detail-scroll{
-    overflow:visible !important; height:auto !important; display:block !important; background:#fff !important;
-  }
-  .detail-scroll{padding:22px 26px !important}
-  .sermon-card, .note-section, .scripture-box{box-shadow:none !important; backdrop-filter:none !important}
-  .scripture-box{display:none !important} /* 노트 흐름 맨 앞에 다시 넣어서 대신 보여줘요(왼쪽 단에 위치) */
-  .sermon-header{display:none !important}
-  #sermon-header-print{
-    display:block !important; background:#efe7fb; border-radius:12px; padding:14px 18px; margin-bottom:16px;
-    font-family:'NanumSquare','Nanum Gothic',sans-serif;
-  }
-  .note-section{border:none !important; break-inside:auto !important; page-break-inside:auto !important; padding:4px 2px !important; background:transparent !important}
-  #note-editor{display:none !important}
-  #note-editor-print{display:block !important}
-  .print-scale{
-    white-space:pre-wrap; word-break:break-word;
-    font-family:'NanumSquare','Nanum Gothic',sans-serif; font-size:var(--print-font-size); line-height:1.5; color:#000;
-    break-inside:auto !important; page-break-inside:auto !important;
-  }
-  .print-scale .verse-line, .print-scale .verse-num, .print-scale .scripture-ref{
-    font-size:var(--print-font-size) !important; line-height:1.5 !important;
-  }
-  .print-scale.two-col{
-    column-count:2; column-gap:30px; column-rule:1px solid #e5ddc5; column-fill:auto;
-    break-inside:auto !important; page-break-inside:auto !important;
-  }
-  .note-image-item{max-width:100% !important; break-inside:avoid !important; page-break-inside:avoid !important}
-  .note-image-thumb{box-shadow:none !important; border:1px solid #ddd !important}
-  body.batch-print-mode .filter-bar, body.batch-print-mode .scroll-area,
-  body.batch-print-mode .select-action-bar, body.batch-print-mode #fab-add-sermon{
-    display:none !important;
-  }
-  /* 이전에 열어봤던 설교 상세화면(#view-detail)이 남아있다가 강제로 다시 보이는 규칙(위쪽 #view-detail
-     규칙)보다 우선하도록, 배치 인쇄 중에는 확실히 숨겨요. */
-  body.batch-print-mode #view-detail{ display:none !important; }
-  body.batch-print-mode #batch-print-root{ display:block !important; }
-}
 </style>
 
 </head>
@@ -344,7 +299,6 @@ body::before{
         <div class="d-title" id="detail-title"></div>
         <div class="d-meta" id="detail-meta"></div>
       </div>
-      <div id="sermon-header-print"></div>
       <div class="scripture-box hidden" id="detail-scripture-box">
         <div class="scripture-ref" id="detail-scripture-ref"></div>
         <div id="detail-scripture-text"></div>
@@ -373,7 +327,6 @@ body::before{
           <div class="bible-search-hint">검색하면 노트 커서 위치에 바로 삽입돼요</div>
         </div>
         <textarea id="note-editor" placeholder="설교를 들으며 마음에 남는 것을 자유롭게 적어보세요..." oninput="scheduleNoteSave();autoGrowTextarea(this)"></textarea>
-        <div id="note-editor-print" class="print-scale"></div>
         <div class="note-image-gallery hidden" id="note-image-gallery"></div>
       </div>
     </div>
@@ -424,24 +377,6 @@ body::before{
       <div class="modal-btn-row">
         <button class="btn-secondary hidden" id="delete-sermon-btn" onclick="deleteSermon()">삭제</button>
         <button class="btn-primary" onclick="saveSermon()">저장</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div id="batch-print-root"></div>
-
-<div class="modal-overlay" id="pdf-preview-modal" onclick="closeModal('pdf-preview-modal',event)">
-  <div class="modal" style="max-width:640px">
-    <div class="modal-header">
-      <span class="modal-title">📄 PDF 미리보기</span>
-      <button class="modal-close" onclick="closeModalDirect('pdf-preview-modal')">✕</button>
-    </div>
-    <div class="modal-body">
-      <div id="pdf-preview-body" style="background:#fdfaf3;border-radius:12px;padding:22px;overflow-x:auto"></div>
-      <div class="modal-btn-row">
-        <button class="btn-secondary" onclick="closeModalDirect('pdf-preview-modal')">취소</button>
-        <button class="btn-primary" onclick="confirmPrintPDF()">⬇ PDF로 다운로드</button>
       </div>
     </div>
   </div>
@@ -1003,7 +938,7 @@ function getReferencedImageNums(noteText){
 }
 
 // 노트 본문의 [사진N] 표시를 실제 이미지로 바꿔서, 내보낼 때는 본문 안에 그대로 삽입되도록 해요
-function buildNoteHtmlWithImages(noteText, images){
+function buildNoteBlocksArray(noteText, images){
   const byNum = {};
   (images || []).forEach(img=>{ if(img.num) byNum[img.num] = img; });
 
@@ -1020,14 +955,20 @@ function buildNoteHtmlWithImages(noteText, images){
       const widthPx = Math.min(imageWidthPxFor(img), 260);
       return `<img src="${img.dataUrl}" style="float:right;width:${widthPx}px;max-width:48%;height:auto;margin:4px 0 10px 14px;border-radius:10px;border:3px solid #fff;box-shadow:0 0 0 1px rgba(189,150,64,0.2)">`;
     });
-    return `<div style="white-space:pre-wrap;margin-bottom:14px">${withImages}</div>`;
-  }).join('');
+    // overflow:hidden으로 새 블록 서식 맥락을 만들어서, float(사진)이 글보다 길어도
+    // 이 div의 높이(측정값)에 사진 높이까지 정확히 포함되도록 해요.
+    return `<div style="white-space:pre-wrap;margin-bottom:14px;overflow:hidden">${withImages}</div>`;
+  }).filter(Boolean);
+}
+
+function buildNoteHtmlWithImages(noteText, images){
+  return buildNoteBlocksArray(noteText, images).join('');
 }
 
 function buildScripturePrintBlockHtml(s){
   if(!s.scriptureHtml) return '';
   return `<div style="break-inside:avoid;background:#faf4e2;border:1px solid #f0e1b4;border-radius:12px;padding:14px 16px;margin-bottom:16px">`
-    + `<div style="font-size:var(--print-font-size);font-weight:800;color:#96742c;margin-bottom:8px">${escapeHtml(s.scriptureRef||'')}</div>`
+    + `<div class="scripture-ref" style="font-size:var(--print-font-size);font-weight:800;color:#96742c;margin-bottom:8px">${escapeHtml(s.scriptureRef||'')}</div>`
     + s.scriptureHtml
     + `</div>`;
 }
@@ -1069,7 +1010,7 @@ function computeFitFontSizePt(s, noteText, twoCol){
   probe.style.cssText = `position:fixed;left:-9999px;top:0;width:${columnWidthPx}px;font-family:'NanumSquare','Nanum Gothic',sans-serif;white-space:pre-wrap;word-break:break-word;`;
   document.body.appendChild(probe);
 
-  let fontSize = 9;
+  let fontSize = 11;
   const minFontSize = 6;
   while(fontSize > minFontSize){
     probe.style.fontSize = fontSize + 'pt';
@@ -1086,85 +1027,157 @@ function computeFitFontSizePt(s, noteText, twoCol){
   return fontSize;
 }
 
-function exportNoteAsPDF(){
+// 화면 밖에서 설교 내용을 A4 가로 폭에 맞춰 렌더링한 뒤 캡처할 컨테이너를 만들어요
+function buildPdfCaptureContainer(s, noteText, twoCol, fontSizePt){
+  const headerHtml = `<div style="background:#efe7fb;border-radius:12px;padding:14px 18px;margin-bottom:16px">${buildHeaderPrintHtml(s)}</div>`;
+
+  const referencedNums = getReferencedImageNums(noteText);
+  const orphanImages = (s.images || []).filter(img=>!referencedNums.has(img.num));
+  const orphanImagesHtml = orphanImages.length
+    ? `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:14px;clear:both">
+         ${orphanImages.map(img=>`<img src="${img.dataUrl}" style="width:${imageWidthPxFor(img)}px;height:auto;display:block;border-radius:10px;border:3px solid #fff;box-shadow:0 0 0 1px rgba(189,150,64,0.2)">`).join('')}
+       </div>`
+    : '';
+
+  const container = document.createElement('div');
+  container.style.cssText = `position:fixed;left:-9999px;top:0;background:#fff;`
+    + `padding:6mm;box-sizing:border-box;font-family:'NanumSquare','Nanum Gothic',sans-serif;`;
+  document.body.appendChild(container);
+
+  const blocks = [buildScripturePrintBlockHtml(s), ...buildNoteBlocksArray(noteText, s.images)].filter(Boolean);
+
+  if(!twoCol){
+    // ── 1단: 읽기 편한 폭으로 좁게 ──
+    container.style.width = Math.round(mmToPx(190)) + 'px';
+    container.innerHTML = `${headerHtml}<div style="white-space:pre-wrap;word-break:break-word;font-size:${fontSizePt}pt;line-height:1.5;color:#000">${blocks.join('')}</div>${orphanImagesHtml}`;
+  } else {
+    // ── 2단: html2canvas가 CSS의 column-count를 지원하지 않아서, 직접 두 칸(flex)으로 나눠 채워요 ──
+    const fullWidthPx = Math.round(mmToPx(291));
+    const gapPx = 30;
+    const columnWidthPx = (fullWidthPx - gapPx) / 2;
+    container.style.width = fullWidthPx + 'px';
+
+    // 각 블록의 높이를 재기 위한 임시 측정용 컬럼
+    const measure = document.createElement('div');
+    measure.style.cssText = `width:${columnWidthPx}px;font-size:${fontSizePt}pt;line-height:1.5;white-space:pre-wrap;word-break:break-word;`;
+    blocks.forEach(html=>{
+      const el = document.createElement('div');
+      el.innerHTML = html;
+      measure.appendChild(el);
+    });
+    container.appendChild(measure);
+    // 성경 본문 안의 절 번호/절 텍스트는 자체 기본 글자 크기를 갖고 있어서, 실제 출력 때 축소되는
+    // fontSizePt를 여기서도 먼저 적용해줘야 측정 높이가 실제 렌더링 높이와 맞아요.
+    // (이걸 빼먹으면 성경 본문 블록의 측정 높이가 실제보다 훨씬 크게 잡혀서, 왼쪽 칸을 다 채우기도
+    // 전에 다음 내용이 오른쪽으로 넘어가버리는 버그가 생겨요.)
+    measure.querySelectorAll('.verse-line, .verse-num, .scripture-ref').forEach(el=>{
+      el.style.fontSize = fontSizePt + 'pt';
+      el.style.lineHeight = '1.5';
+    });
+    const blockHeights = Array.from(measure.children).map(el=>el.getBoundingClientRect().height);
+    container.removeChild(measure);
+
+    const totalHeight = blockHeights.reduce((a,b)=>a+b, 0);
+
+    // "절반씩 나누기" 대신, 왼쪽 칸을 한 페이지 분량만큼 먼저 채우고 그 이후부터 오른쪽으로 넘기는 방식이에요.
+    // 이러면 노트가 짧을 땐 본문 말씀 아래로 자연스럽게 이어지고(오른쪽은 비워둠), 노트가 길 때만 오른쪽으로 넘어가요.
+    const headerProbe = document.createElement('div');
+    headerProbe.style.cssText = `position:fixed;left:-9999px;top:0;width:${fullWidthPx}px;box-sizing:border-box;font-family:'NanumSquare','Nanum Gothic',sans-serif;`;
+    headerProbe.innerHTML = headerHtml;
+    document.body.appendChild(headerProbe);
+    const headerHeightPx = headerProbe.getBoundingClientRect().height + 16;
+    document.body.removeChild(headerProbe);
+    const pageContentHeightPx = mmToPx(210 - 5 * 2); // A4 가로 높이 - 위아래 5mm 여백
+    const columnTargetPx = Math.max(60, pageContentHeightPx - headerHeightPx);
+
+    let acc = 0, splitIdx = blocks.length;
+    for(let i=0;i<blockHeights.length;i++){
+      if(acc > 0 && acc + blockHeights[i] > columnTargetPx){ splitIdx = i; break; }
+      acc += blockHeights[i];
+    }
+    splitIdx = Math.max(1, Math.min(blocks.length, splitIdx));
+
+    const col1Html = blocks.slice(0, splitIdx).join('');
+    const col2Html = blocks.slice(splitIdx).join('');
+    const colStyle = `width:${columnWidthPx}px;font-size:${fontSizePt}pt;line-height:1.5;white-space:pre-wrap;word-break:break-word;color:#000`;
+
+    container.innerHTML = `${headerHtml}<div style="display:flex;gap:${gapPx}px">`
+      + `<div style="${colStyle}">${col1Html}</div>`
+      + `<div style="${colStyle}">${col2Html}</div>`
+      + `</div>${orphanImagesHtml}`;
+  }
+
+  container.querySelectorAll('.verse-line, .verse-num, .scripture-ref').forEach(el=>{
+    el.style.fontSize = fontSizePt + 'pt';
+    el.style.lineHeight = '1.5';
+  });
+  return container;
+}
+
+async function exportNoteAsPDF(){
   if(!currentSermonId){ showToast('설교를 먼저 선택해주세요'); return; }
   const s = sermons.find(x=>x.id===currentSermonId);
   if(!s) return;
-  const noteText = document.getElementById('note-editor').value;
-  const twoCol = noteText.trim().length > 300;
+  if(typeof html2canvas === 'undefined' || typeof window.jspdf === 'undefined'){
+    showToast('⚠️ PDF 기능을 불러오지 못했어요 (인터넷 연결을 확인해주세요)');
+    return;
+  }
+  if(document.fonts && document.fonts.ready){
+    try{ await document.fonts.ready; }catch(e){}
+  }
+  showToast('PDF 만드는 중...');
 
-  // 내용이 1페이지에 들어가는지 미리 확인하고, 안 들어가면 폰트를 자동으로 줄여요
-  const fitFontSize = computeFitFontSizePt(s, noteText, twoCol);
+  const noteText = s.note || '';
+  // 노트 길이와 상관없이 모든 설교노트 PDF가 같은 포맷(2단)을 유지하도록 항상 2단으로 만들어요
+  const twoCol = true;
+  // 노트가 한 페이지에 최대한 알맞게 들어가도록, 헤더는 그대로 두고 본문 글자 크기만 맞춰요
+  const fontSizePt = computeFitFontSizePt(s, noteText, twoCol);
+  const container = buildPdfCaptureContainer(s, noteText, twoCol, fontSizePt);
 
-  // 실제 인쇄 전에, 같은 내용을 화면 안 미리보기로 먼저 보여줘요
-  const headerHtml = `<div style="background:#efe7fb;border-radius:12px;padding:14px 18px;margin-bottom:16px;font-family:'NanumSquare','Nanum Gothic',sans-serif">${buildHeaderPrintHtml(s)}</div>`;
-  const bodyHtml = buildScripturePrintBlockHtml(s) + buildNoteHtmlWithImages(noteText, s.images);
-  document.getElementById('pdf-preview-body').innerHTML =
-    headerHtml + `<div class="print-scale${twoCol ? ' two-col' : ''}" style="--print-font-size:${fitFontSize}pt">${bodyHtml}</div>`;
+  try{
+    const canvas = await html2canvas(container, { backgroundColor:'#ffffff', scale:2 });
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation:'landscape', unit:'mm', format:'a4' });
+    addCanvasAsPdfPage(doc, canvas, 5, true);
 
-  openModal('pdf-preview-modal');
+    const safeTitle = (s.title || '설교노트').replace(/[\\/:*?"<>|]/g,'').slice(0,40);
+    doc.save(`${safeTitle}_${s.date||''}.pdf`);
+    showToast('✓ PDF가 다운로드됐어요');
+  }catch(e){
+    console.error(e);
+    showToast('⚠️ PDF 생성에 실패했어요');
+  }finally{
+    document.body.removeChild(container);
+  }
 }
 
-function confirmPrintPDF(){
-  if(!currentSermonId) return;
-  const s = sermons.find(x=>x.id===currentSermonId);
-  if(!s) return;
-  // 텍스트영역(textarea)은 인쇄 시 페이지를 넘어 나뉘어 인쇄되지 않아서,
-  // 인쇄 전용 영역으로 복사해두면 노트가 페이지 경계에서 자연스럽게 이어져요.
-  document.getElementById('sermon-header-print').innerHTML = buildHeaderPrintHtml(s);
-  const noteText = document.getElementById('note-editor').value;
-  const printDiv = document.getElementById('note-editor-print');
-  const twoCol = noteText.trim().length > 300;
+// 캡처한 캔버스 하나를 jsPDF 문서의 "새 페이지"로(이미 페이지가 있으면 addPage 먼저) 비율을 유지한 채
+// 페이지 안에 딱 맞게(줄어들기만 하고 넘치지 않게) 넣어요. 낱장/합본 PDF가 항상 같은 방식으로 그려지도록
+// exportNoteAsPDF와 mergeSelectedToPDF가 이 함수를 공유해요.
+function addCanvasAsPdfPage(doc, canvas, marginMm, isFirstPage){
+  if(!isFirstPage) doc.addPage('a4', 'landscape');
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const usableW = pageW - marginMm * 2;
+  const usableH = pageH - marginMm * 2;
 
-  const fitFontSize = computeFitFontSizePt(s, noteText, twoCol);
-  document.documentElement.style.setProperty('--print-font-size', fitFontSize + 'pt');
-
-  // 본문 말씀을 노트 흐름의 맨 앞에 넣어서, 2단일 때 왼쪽 단 위쪽에 자리잡도록 해요
-  // (별도 전체폭 박스가 아니라 노트와 같은 흐름 안에 있어야 왼쪽에 위치해요)
-  printDiv.innerHTML = buildScripturePrintBlockHtml(s) + buildNoteHtmlWithImages(noteText, s.images);
-  // 노트가 어느 정도 길 때만 2단으로 — 짧은 노트까지 2단으로 나누면 오히려 어색해요
-  printDiv.classList.toggle('two-col', twoCol);
-
-  // 본문에 이미 [사진N]으로 삽입된 사진은 아래쪽 사진 갤러리에 중복으로 나오지 않도록 숨겨요
-  const referencedNums = getReferencedImageNums(noteText);
-  document.querySelectorAll('#note-image-gallery .note-image-item').forEach(item=>{
-    const n = parseInt(item.dataset.num, 10);
-    item.classList.toggle('print-hide-inline', referencedNums.has(n));
-  });
-
-  closeModalDirect('pdf-preview-modal');
-  setTimeout(()=>window.print(), 400);
+  const imgRatio = canvas.width / canvas.height;
+  let drawW = usableW, drawH = usableW / imgRatio;
+  if(drawH > usableH){ drawH = usableH; drawW = usableH * imgRatio; }
+  // 내용이 짧아도 페이지 가운데 뜨지 않도록, 왼쪽 위(여백 지점)부터 채워요
+  const imgData = canvas.toDataURL('image/jpeg', 0.95);
+  doc.addImage(imgData, 'JPEG', marginMm, marginMm, drawW, drawH);
 }
-
-// 인쇄가 끝나면(취소 포함) 갤러리에 임시로 씌워둔 숨김 처리와 폰트 크기를 되돌려요
-window.addEventListener('afterprint', ()=>{
-  document.querySelectorAll('.print-hide-inline').forEach(el=>el.classList.remove('print-hide-inline'));
-  document.documentElement.style.setProperty('--print-font-size', '9pt');
-  document.body.classList.remove('batch-print-mode');
-  const batchRoot = document.getElementById('batch-print-root');
-  if(batchRoot) batchRoot.innerHTML = '';
-});
 
 // ── 여러 설교를 하나의 PDF로 합쳐서 내보내기 ──
-function buildSermonPrintBlock(s, isFirst){
-  const noteText = s.note || '';
-  // 합쳐서 인쇄할 때는 설교마다 노트 길이에 따라 1단/2단이 서로 달라지면 보기에 들쭉날쭉하니,
-  // 모두 2단으로 통일해요. (짧은 노트는 그냥 오른쪽 단이 비게 될 뿐이에요)
-  const twoCol = true;
-  const fitFontSize = computeFitFontSizePt(s, noteText, twoCol);
-  const headerHtml = `<div style="background:#efe7fb;border-radius:12px;padding:14px 18px;margin-bottom:16px;font-family:'NanumSquare','Nanum Gothic',sans-serif">${buildHeaderPrintHtml(s)}</div>`;
-  // 문단 안의 사진(float)이 다음 설교의 강제 페이지 나눔 너머로 새어나가지 않도록,
-  // 각 설교 내용의 맨 끝에서 확실히 정리(clear)해줘요.
-  const bodyHtml = buildScripturePrintBlockHtml(s) + buildNoteHtmlWithImages(noteText, s.images)
-    + '<div style="clear:both;height:0;overflow:hidden"></div>';
-  return `<div style="${isFirst ? '' : 'break-before:page;page-break-before:always;'}">
-    ${headerHtml}
-    <div class="print-scale${twoCol ? ' two-col' : ''}" style="--print-font-size:${fitFontSize}pt">${bodyHtml}</div>
-  </div>`;
-}
-
+// 낱장 PDF와 똑같은 방식(같은 헤더/2단 레이아웃 생성 함수 + html2canvas)으로 설교마다 한 페이지씩
+// 그린 뒤, 인쇄창 없이 바로 하나의 PDF 파일로 다운로드해요.
 async function mergeSelectedToPDF(){
   if(selectedIds.size === 0){ showToast('합칠 설교를 먼저 선택해주세요'); return; }
+  if(typeof html2canvas === 'undefined' || typeof window.jspdf === 'undefined'){
+    showToast('⚠️ PDF 기능을 불러오지 못했어요 (인터넷 연결을 확인해주세요)');
+    return;
+  }
   if(document.fonts && document.fonts.ready){
     try{ await document.fonts.ready; }catch(e){}
   }
@@ -1172,12 +1185,34 @@ async function mergeSelectedToPDF(){
     .filter(s=>selectedIds.has(s.id))
     .sort((a,b)=>(a.date||'').localeCompare(b.date||''));
 
-  const root = document.getElementById('batch-print-root');
-  root.innerHTML = selectedSermons.map((s, i)=>buildSermonPrintBlock(s, i === 0)).join('');
-  document.body.classList.add('batch-print-mode');
+  showToast(`설교 ${selectedSermons.length}개를 PDF로 합치는 중...`);
 
-  showToast(`설교 ${selectedSermons.length}개를 한 PDF로 합쳐요 · 인쇄창에서 "PDF로 저장"을 선택해주세요`);
-  setTimeout(()=>window.print(), 500);
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:'landscape', unit:'mm', format:'a4' });
+
+  try{
+    for(let i = 0; i < selectedSermons.length; i++){
+      const s = selectedSermons[i];
+      const noteText = s.note || '';
+      const twoCol = true;
+      const fontSizePt = computeFitFontSizePt(s, noteText, twoCol);
+      const container = buildPdfCaptureContainer(s, noteText, twoCol, fontSizePt);
+      try{
+        const canvas = await html2canvas(container, { backgroundColor:'#ffffff', scale:2 });
+        addCanvasAsPdfPage(doc, canvas, 5, i === 0);
+      }finally{
+        document.body.removeChild(container);
+      }
+    }
+
+    const today = new Date().toISOString().slice(0,10);
+    doc.save(`설교노트_모음(${selectedSermons.length}개)_${today}.pdf`);
+    showToast('✓ PDF가 다운로드됐어요');
+    cancelSelectMode();
+  }catch(e){
+    console.error(e);
+    showToast('⚠️ PDF 생성에 실패했어요');
+  }
 }
 
 function buildExportContainer(s){
