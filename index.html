@@ -1217,11 +1217,11 @@ async function mergeSelectedToPDF(){
 
 function buildExportContainer(s){
   const container = document.createElement('div');
-  container.style.cssText = 'position:fixed;left:-9999px;top:0;width:640px;background:#fdfaf3;padding:30px;font-family:NanumSquare,Nanum Gothic,sans-serif;color:#262c4a;box-sizing:border-box;';
+  container.style.cssText = 'position:fixed;left:-9999px;top:0;width:760px;background:#fdfaf3;padding:34px;font-family:NanumSquare,Nanum Gothic,sans-serif;color:#262c4a;box-sizing:border-box;';
 
   const scriptureHtml = s.scriptureHtml
-    ? `<div style="background:#faf4e2;border:1px solid #f0e1b4;border-radius:12px;padding:16px 18px;margin-bottom:18px">
-         <div style="font-size:13px;font-weight:800;color:#96742c;margin-bottom:8px">${escapeHtml(s.scriptureRef||'')}</div>
+    ? `<div style="background:#faf4e2;border:1px solid #f0e1b4;border-radius:12px;padding:18px 20px;margin-bottom:18px">
+         <div style="font-size:16px;font-weight:800;color:#96742c;margin-bottom:8px">${escapeHtml(s.scriptureRef||'')}</div>
          ${s.scriptureHtml}
        </div>`
     : '';
@@ -1241,10 +1241,13 @@ function buildExportContainer(s){
     ${buildHeaderPrintHtml(s)}
     <div style="height:16px"></div>
     ${scriptureHtml}
-    <div style="font-size:13px;font-weight:800;color:#282d54;margin-bottom:8px">📝 나의 노트</div>
-    <div style="white-space:pre-wrap;font-size:14px;line-height:1.85">${noteHtml}</div>
+    <div style="font-size:16px;font-weight:800;color:#282d54;margin-bottom:8px">📝 나의 노트</div>
+    <div style="white-space:pre-wrap;font-size:17px;line-height:1.85">${noteHtml}</div>
     ${orphanImagesHtml}
   `;
+  // 성경 본문 절 번호/절 텍스트도 노트 글씨 크기에 맞춰 함께 키워요
+  container.querySelectorAll('.verse-line').forEach(el=>{ el.style.fontSize = '17px'; el.style.lineHeight = '1.85'; });
+  container.querySelectorAll('.verse-num').forEach(el=>{ el.style.fontSize = '13px'; });
   document.body.appendChild(container);
   return container;
 }
